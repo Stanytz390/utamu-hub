@@ -10,21 +10,17 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as UtamuRouteImport } from './routes/utamu'
-import { Route as ProfileRouteImport } from './routes/profile'
 import { Route as GroupsRouteImport } from './routes/groups'
 import { Route as DadazRouteImport } from './routes/dadaz'
 import { Route as AuthRouteImport } from './routes/auth'
+import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as DadazIdRouteImport } from './routes/dadaz.$id'
+import { Route as AuthenticatedProfileRouteImport } from './routes/_authenticated/profile'
 
 const UtamuRoute = UtamuRouteImport.update({
   id: '/utamu',
   path: '/utamu',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ProfileRoute = ProfileRouteImport.update({
-  id: '/profile',
-  path: '/profile',
   getParentRoute: () => rootRouteImport,
 } as any)
 const GroupsRoute = GroupsRouteImport.update({
@@ -42,6 +38,10 @@ const AuthRoute = AuthRouteImport.update({
   path: '/auth',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
+  id: '/_authenticated',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -52,14 +52,19 @@ const DadazIdRoute = DadazIdRouteImport.update({
   path: '/$id',
   getParentRoute: () => DadazRoute,
 } as any)
+const AuthenticatedProfileRoute = AuthenticatedProfileRouteImport.update({
+  id: '/profile',
+  path: '/profile',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/dadaz': typeof DadazRouteWithChildren
   '/groups': typeof GroupsRoute
-  '/profile': typeof ProfileRoute
   '/utamu': typeof UtamuRoute
+  '/profile': typeof AuthenticatedProfileRoute
   '/dadaz/$id': typeof DadazIdRoute
 }
 export interface FileRoutesByTo {
@@ -67,18 +72,19 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/dadaz': typeof DadazRouteWithChildren
   '/groups': typeof GroupsRoute
-  '/profile': typeof ProfileRoute
   '/utamu': typeof UtamuRoute
+  '/profile': typeof AuthenticatedProfileRoute
   '/dadaz/$id': typeof DadazIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/auth': typeof AuthRoute
   '/dadaz': typeof DadazRouteWithChildren
   '/groups': typeof GroupsRoute
-  '/profile': typeof ProfileRoute
   '/utamu': typeof UtamuRoute
+  '/_authenticated/profile': typeof AuthenticatedProfileRoute
   '/dadaz/$id': typeof DadazIdRoute
 }
 export interface FileRouteTypes {
@@ -88,8 +94,8 @@ export interface FileRouteTypes {
     | '/auth'
     | '/dadaz'
     | '/groups'
-    | '/profile'
     | '/utamu'
+    | '/profile'
     | '/dadaz/$id'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -97,26 +103,27 @@ export interface FileRouteTypes {
     | '/auth'
     | '/dadaz'
     | '/groups'
-    | '/profile'
     | '/utamu'
+    | '/profile'
     | '/dadaz/$id'
   id:
     | '__root__'
     | '/'
+    | '/_authenticated'
     | '/auth'
     | '/dadaz'
     | '/groups'
-    | '/profile'
     | '/utamu'
+    | '/_authenticated/profile'
     | '/dadaz/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AuthRoute: typeof AuthRoute
   DadazRoute: typeof DadazRouteWithChildren
   GroupsRoute: typeof GroupsRoute
-  ProfileRoute: typeof ProfileRoute
   UtamuRoute: typeof UtamuRoute
 }
 
@@ -127,13 +134,6 @@ declare module '@tanstack/react-router' {
       path: '/utamu'
       fullPath: '/utamu'
       preLoaderRoute: typeof UtamuRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/profile': {
-      id: '/profile'
-      path: '/profile'
-      fullPath: '/profile'
-      preLoaderRoute: typeof ProfileRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/groups': {
@@ -157,6 +157,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authenticated': {
+      id: '/_authenticated'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AuthenticatedRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -171,8 +178,26 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DadazIdRouteImport
       parentRoute: typeof DadazRoute
     }
+    '/_authenticated/profile': {
+      id: '/_authenticated/profile'
+      path: '/profile'
+      fullPath: '/profile'
+      preLoaderRoute: typeof AuthenticatedProfileRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
   }
 }
+
+interface AuthenticatedRouteRouteChildren {
+  AuthenticatedProfileRoute: typeof AuthenticatedProfileRoute
+}
+
+const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
+  AuthenticatedProfileRoute: AuthenticatedProfileRoute,
+}
+
+const AuthenticatedRouteRouteWithChildren =
+  AuthenticatedRouteRoute._addFileChildren(AuthenticatedRouteRouteChildren)
 
 interface DadazRouteChildren {
   DadazIdRoute: typeof DadazIdRoute
@@ -186,10 +211,10 @@ const DadazRouteWithChildren = DadazRoute._addFileChildren(DadazRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AuthRoute: AuthRoute,
   DadazRoute: DadazRouteWithChildren,
   GroupsRoute: GroupsRoute,
-  ProfileRoute: ProfileRoute,
   UtamuRoute: UtamuRoute,
 }
 export const routeTree = rootRouteImport
