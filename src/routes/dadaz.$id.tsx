@@ -1,6 +1,6 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { ArrowLeft, Heart, Users, MapPin, MessageCircle, Phone } from "lucide-react";
-import { profiles } from "@/lib/mock-data";
+import { profiles, type ProfileItem } from "@/lib/mock-data";
 
 export const Route = createFileRoute("/dadaz/$id")({
   head: ({ params }) => {
@@ -12,7 +12,7 @@ export const Route = createFileRoute("/dadaz/$id")({
       ],
     };
   },
-  loader: ({ params }) => {
+  loader: ({ params }): ProfileItem => {
     const p = profiles.find((x) => x.id === params.id);
     if (!p) throw notFound();
     return p;
