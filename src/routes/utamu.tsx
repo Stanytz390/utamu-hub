@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useMemo } from "react";
+import { Search } from "lucide-react";
 import { videos } from "@/lib/mock-data";
 import { VideoCard } from "@/components/VideoCard";
 
@@ -19,20 +20,40 @@ const filters = ["All", "New", "Old", "Free", "Premium"] as const;
 
 function Utamu() {
   const [f, setF] = useState<(typeof filters)[number]>("All");
+  const [q, setQ] = useState("");
 
   const list = useMemo(() => {
     const sorted = [...videos];
     if (f === "New") sorted.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
     if (f === "Old") sorted.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
-    if (f === "Free") return sorted.filter((v) => v.price === 0);
-    if (f === "Premium") return sorted.filter((v) => v.price > 0);
-    return sorted;
-  }, [f]);
+    let out = sorted;
+    if (f === "Free") out = out.filter((v) => v.price === 0);
+    if (f === "Premium") out = out.filter((v) => v.price > 0);
+    const needle = q.trim().toLowerCase();
+    if (needle) {
+      out = out.filter(
+        (v) =>
+          v.title.toLowerCase().includes(needle) ||
+          v.description.toLowerCase().includes(needle) ||
+          v.creator.toLowerCase().includes(needle),
+      );
+    }
+    return out;
+  }, [f, q]);
 
   return (
     <div className="mx-auto max-w-lg">
       <header className="sticky top-0 z-40 border-b border-border/60 bg-background/80 px-4 py-3 backdrop-blur-xl">
         <h1 className="text-xl font-black">Utamu Videos</h1>
+        <div className="relative mt-3">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Tafuta video, creator, description..."
+            className="w-full rounded-full border border-border bg-muted py-2 pl-9 pr-3 text-sm outline-none focus:border-primary"
+          />
+        </div>
         <div className="mt-3 flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {filters.map((label) => (
             <button
@@ -51,6 +72,11 @@ function Utamu() {
       </header>
 
       <section className="grid grid-cols-2 gap-3 p-4">
+        {list.length === 0 && (
+          <p className="col-span-2 py-8 text-center text-sm text-muted-foreground">
+            Hakuna video iliyopatikana.
+          </p>
+        )}
         {list.map((v) => (
           <VideoCard key={v.id} video={v} />
         ))}

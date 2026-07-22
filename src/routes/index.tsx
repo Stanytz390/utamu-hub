@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState } from "react";
-import { Search, Bell, Flame } from "lucide-react";
+import { useState, useMemo } from "react";
+import { Search, Bell, Flame, X } from "lucide-react";
 import { videos, profiles, groups, type Category } from "@/lib/mock-data";
 import { VideoCard } from "@/components/VideoCard";
 
@@ -23,9 +23,48 @@ const filters: { id: Category; label: string }[] = [
 
 function Home() {
   const [active, setActive] = useState<Category>("all");
+  const [q, setQ] = useState("");
   const showVideos = active === "all" || active === "utamu";
   const showProfiles = active === "all" || active === "dadaz";
   const showGroups = active === "all" || active === "groups";
+
+  const needle = q.trim().toLowerCase();
+  const fVideos = useMemo(
+    () =>
+      !needle
+        ? videos
+        : videos.filter(
+            (v) =>
+              v.title.toLowerCase().includes(needle) ||
+              v.description.toLowerCase().includes(needle) ||
+              v.creator.toLowerCase().includes(needle),
+          ),
+    [needle],
+  );
+  const fProfiles = useMemo(
+    () =>
+      !needle
+        ? profiles
+        : profiles.filter(
+            (p) =>
+              p.username.toLowerCase().includes(needle) ||
+              p.location.toLowerCase().includes(needle) ||
+              p.bio.toLowerCase().includes(needle),
+          ),
+    [needle],
+  );
+  const fGroups = useMemo(
+    () =>
+      !needle
+        ? groups
+        : groups.filter(
+            (g) =>
+              g.name.toLowerCase().includes(needle) ||
+              g.description.toLowerCase().includes(needle) ||
+              g.category.toLowerCase().includes(needle),
+          ),
+    [needle],
+  );
 
   return (
     <div className="mx-auto max-w-lg">
@@ -36,13 +75,27 @@ function Home() {
             UTAMU PORI
           </h1>
           <div className="flex items-center gap-2">
-            <button className="rounded-full bg-muted p-2 text-muted-foreground">
-              <Search size={18} />
-            </button>
-            <button className="rounded-full bg-muted p-2 text-muted-foreground">
+            <Link to="/auth" className="rounded-full bg-muted p-2 text-muted-foreground">
               <Bell size={18} />
-            </button>
+            </Link>
           </div>
+        </div>
+        <div className="relative mt-3">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Tafuta videos, dadaz, groups..."
+            className="w-full rounded-full border border-border bg-muted py-2 pl-9 pr-9 text-sm outline-none focus:border-primary"
+          />
+          {q && (
+            <button
+              onClick={() => setQ("")}
+              className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full p-1 text-muted-foreground hover:text-foreground"
+            >
+              <X size={14} />
+            </button>
+          )}
         </div>
         <div className="mt-3 flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
           {filters.map((f) => (
@@ -62,6 +115,7 @@ function Home() {
       </header>
 
       {/* Hero stories row */}
+      {!needle && (
       <section className="px-4 py-4">
         <div className="flex gap-3 overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {profiles.map((p) => (
@@ -88,16 +142,17 @@ function Home() {
           ))}
         </div>
       </section>
+      )}
 
       {/* Trending sliding */}
-      {showVideos && (
+      {showVideos && fVideos.length > 0 && (
         <section className="px-4 pb-4">
           <div className="mb-3 flex items-center gap-2">
             <Flame className="text-primary" size={18} />
             <h2 className="text-lg font-bold">Utamu Trending</h2>
           </div>
           <div className="-mx-4 flex gap-3 overflow-x-auto px-4 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            {videos.map((v) => (
+            {fVideos.map((v) => (
               <div key={v.id} className="w-64 flex-shrink-0">
                 <VideoCard video={v} />
               </div>
@@ -107,7 +162,7 @@ function Home() {
       )}
 
       {/* Dadaz preview */}
-      {showProfiles && (
+      {showProfiles && fProfiles.length > 0 && (
         <section className="px-4 pb-4">
           <div className="mb-3 flex items-center justify-between">
             <h2 className="text-lg font-bold">Dadaz Poa</h2>
@@ -116,7 +171,7 @@ function Home() {
             </Link>
           </div>
           <div className="grid grid-cols-2 gap-3">
-            {profiles.slice(0, 4).map((p) => (
+            {fProfiles.slice(0, 4).map((p) => (
               <Link
                 key={p.id}
                 to="/dadaz/$id"
@@ -136,7 +191,7 @@ function Home() {
       )}
 
       {/* Groups preview */}
-      {showGroups && (
+      {showGroups && fGroups.length > 0 && (
         <section className="px-4 pb-8">
           <div className="mb-3 flex items-center justify-between">
             <h2 className="text-lg font-bold">Groups Motomoto</h2>
@@ -145,7 +200,7 @@ function Home() {
             </Link>
           </div>
           <div className="space-y-2">
-            {groups.slice(0, 3).map((g) => (
+            {fGroups.slice(0, 3).map((g) => (
               <div key={g.id} className="flex items-center gap-3 rounded-2xl border border-border bg-card p-3">
                 <img src={g.logo} alt={g.name} className="h-12 w-12 rounded-xl object-cover" loading="lazy" />
                 <div className="min-w-0 flex-1">
@@ -164,6 +219,12 @@ function Home() {
             ))}
           </div>
         </section>
+      )}
+
+      {needle && fVideos.length === 0 && fProfiles.length === 0 && fGroups.length === 0 && (
+        <p className="py-16 text-center text-sm text-muted-foreground">
+          Hakuna kilichopatikana kwa "{q}".
+        </p>
       )}
     </div>
   );
