@@ -9,38 +9,122 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as UtamuRouteImport } from './routes/utamu'
+import { Route as ProfileRouteImport } from './routes/profile'
+import { Route as GroupsRouteImport } from './routes/groups'
+import { Route as DadazRouteImport } from './routes/dadaz'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as DadazIdRouteImport } from './routes/dadaz.$id'
 
+const UtamuRoute = UtamuRouteImport.update({
+  id: '/utamu',
+  path: '/utamu',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProfileRoute = ProfileRouteImport.update({
+  id: '/profile',
+  path: '/profile',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GroupsRoute = GroupsRouteImport.update({
+  id: '/groups',
+  path: '/groups',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DadazRoute = DadazRouteImport.update({
+  id: '/dadaz',
+  path: '/dadaz',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DadazIdRoute = DadazIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => DadazRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/dadaz': typeof DadazRouteWithChildren
+  '/groups': typeof GroupsRoute
+  '/profile': typeof ProfileRoute
+  '/utamu': typeof UtamuRoute
+  '/dadaz/$id': typeof DadazIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/dadaz': typeof DadazRouteWithChildren
+  '/groups': typeof GroupsRoute
+  '/profile': typeof ProfileRoute
+  '/utamu': typeof UtamuRoute
+  '/dadaz/$id': typeof DadazIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/dadaz': typeof DadazRouteWithChildren
+  '/groups': typeof GroupsRoute
+  '/profile': typeof ProfileRoute
+  '/utamu': typeof UtamuRoute
+  '/dadaz/$id': typeof DadazIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths: '/' | '/dadaz' | '/groups' | '/profile' | '/utamu' | '/dadaz/$id'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to: '/' | '/dadaz' | '/groups' | '/profile' | '/utamu' | '/dadaz/$id'
+  id:
+    | '__root__'
+    | '/'
+    | '/dadaz'
+    | '/groups'
+    | '/profile'
+    | '/utamu'
+    | '/dadaz/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  DadazRoute: typeof DadazRouteWithChildren
+  GroupsRoute: typeof GroupsRoute
+  ProfileRoute: typeof ProfileRoute
+  UtamuRoute: typeof UtamuRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/utamu': {
+      id: '/utamu'
+      path: '/utamu'
+      fullPath: '/utamu'
+      preLoaderRoute: typeof UtamuRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/profile': {
+      id: '/profile'
+      path: '/profile'
+      fullPath: '/profile'
+      preLoaderRoute: typeof ProfileRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/groups': {
+      id: '/groups'
+      path: '/groups'
+      fullPath: '/groups'
+      preLoaderRoute: typeof GroupsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/dadaz': {
+      id: '/dadaz'
+      path: '/dadaz'
+      fullPath: '/dadaz'
+      preLoaderRoute: typeof DadazRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -48,22 +132,33 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/dadaz/$id': {
+      id: '/dadaz/$id'
+      path: '/$id'
+      fullPath: '/dadaz/$id'
+      preLoaderRoute: typeof DadazIdRouteImport
+      parentRoute: typeof DadazRoute
+    }
   }
 }
 
+interface DadazRouteChildren {
+  DadazIdRoute: typeof DadazIdRoute
+}
+
+const DadazRouteChildren: DadazRouteChildren = {
+  DadazIdRoute: DadazIdRoute,
+}
+
+const DadazRouteWithChildren = DadazRoute._addFileChildren(DadazRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  DadazRoute: DadazRouteWithChildren,
+  GroupsRoute: GroupsRoute,
+  ProfileRoute: ProfileRoute,
+  UtamuRoute: UtamuRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
