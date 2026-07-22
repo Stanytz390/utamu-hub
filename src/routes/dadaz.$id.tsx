@@ -100,7 +100,7 @@ function DadazDetail() {
 
         <h2 className="mb-3 mt-8 text-lg font-bold">Photos</h2>
         <div className="grid grid-cols-2 gap-2">
-          {p.photos.map((src, i) => (
+          {p.photos.map((src: string, i: number) => (
             <img
               key={i}
               src={src}
