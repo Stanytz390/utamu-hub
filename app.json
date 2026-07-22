@@ -1,0 +1,67 @@
+{
+  "name": "UTAMU PORI",
+  "description": "TikTok-style videos, dadaz profiles, groups, na malipo ya mobile money kwa Tanzania.",
+  "repository": "https://github.com/your-org/utamu-pori",
+  "keywords": ["tanstack-start", "supabase", "speedapesa", "tanzania"],
+  "env": {
+    "SUPABASE_URL": {
+      "description": "Lovable Cloud / Supabase project URL",
+      "required": true
+    },
+    "SUPABASE_PUBLISHABLE_KEY": {
+      "description": "Lovable Cloud publishable (anon) key",
+      "required": true
+    },
+    "SUPABASE_SERVICE_ROLE_KEY": {
+      "description": "Server-only service role key (webhooks, admin ops)",
+      "required": true
+    },
+    "VITE_SUPABASE_URL": {
+      "description": "Client-side Supabase URL (same as SUPABASE_URL)",
+      "required": true
+    },
+    "VITE_SUPABASE_PUBLISHABLE_KEY": {
+      "description": "Client-side publishable key",
+      "required": true
+    },
+    "LOVABLE_API_KEY": {
+      "description": "Lovable AI Gateway key (auto-provisioned on Lovable Cloud)",
+      "required": false
+    },
+    "SPEEDAPESA_API_KEY": {
+      "description": "SpeedaPesa API key (Awamu 3 — payments)",
+      "required": false
+    },
+    "SPEEDAPESA_API_SECRET": {
+      "description": "SpeedaPesa API secret",
+      "required": false
+    },
+    "SPEEDAPESA_MERCHANT_ID": {
+      "description": "SpeedaPesa merchant / business ID",
+      "required": false
+    },
+    "SPEEDAPESA_WEBHOOK_SECRET": {
+      "description": "HMAC secret ya kuthibitisha webhooks za SpeedaPesa",
+      "required": false
+    },
+    "SPEEDAPESA_BASE_URL": {
+      "description": "SpeedaPesa API base URL (mfano https://api.speedapesa.com)",
+      "value": "https://api.speedapesa.com",
+      "required": false
+    }
+  },
+  "formation": {
+    "web": { "quantity": 1, "size": "basic" }
+  },
+  "buildpacks": [
+    { "url": "heroku/nodejs" }
+  ],
+  "stack": "heroku-24",
+  "environments": {
+    "test": {
+      "env": {
+        "NODE_ENV": { "value": "test" }
+      }
+    }
+  }
+}
