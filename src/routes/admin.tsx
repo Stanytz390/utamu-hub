@@ -3,16 +3,15 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
 // ============================================================
-// ROUTE – Disable SSR to avoid server-side auth issues
+// ROUTE – Client-side only
 // ============================================================
 export const Route = createFileRoute("/admin")({
-  // ✅ ssr: false ensures the page only renders on the client
   ssr: false,
   component: AdminDashboard,
 });
 
 // ============================================================
-// ADMIN DASHBOARD – Full client-side
+// ADMIN DASHBOARD
 // ============================================================
 function AdminDashboard() {
   const navigate = useNavigate();
@@ -22,7 +21,6 @@ function AdminDashboard() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [stats, setStats] = useState({ users: 0, videos: 0, groups: 0, dadaz: 0 });
 
-  // Check auth and admin role on client
   useEffect(() => {
     const checkAuth = async () => {
       try {
@@ -32,6 +30,11 @@ function AdminDashboard() {
           return;
         }
 
+        // Auto-promote admin if email matches environment variable
+        const adminEmail = import.meta.env.VITE_ADMIN_EMAIL;
+        let isAdminUser = false;
+
+        // Check user_roles first
         const { data: roleData } = await supabase
           .from("user_roles")
           .select("role")
@@ -39,7 +42,23 @@ function AdminDashboard() {
           .eq("role", "admin")
           .maybeSingle();
 
-        if (!roleData) {
+        if (roleData) {
+          isAdminUser = true;
+        } else if (adminEmail && user.email === adminEmail) {
+          // If email matches, insert admin role and set as admin
+          const { error } = await supabase
+            .from("user_roles")
+            .insert({ user_id: user.id, role: "admin" });
+          if (!error) {
+            isAdminUser = true;
+          } else {
+            console.error("Failed to insert admin role:", error);
+            // Fallback: treat as admin anyway for this session
+            isAdminUser = true;
+          }
+        }
+
+        if (!isAdminUser) {
           alert("You are not an admin.");
           navigate({ to: "/" });
           return;
