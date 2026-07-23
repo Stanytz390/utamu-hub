@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
-import { Download, Play, Lock, Eye, Coins, Share2, Loader2 } from "lucide-react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import type { VideoItem } from "@/lib/mock-data";
 import { supabase } from "@/integrations/supabase/client";
+import { shareContent } from "@/lib/share";
 
 export function VideoCard({ video }: { video: VideoItem }) {
   const navigate = useNavigate();
@@ -52,82 +52,138 @@ export function VideoCard({ video }: { video: VideoItem }) {
     setUnlocked(true);
   };
 
-  const share = async () => {
-    const url = `${window.location.origin}/utamu#${video.id}`;
-    if (navigator.share) {
-      try { await navigator.share({ title: video.title, text: video.description, url }); } catch { /* cancelled */ }
+  const handlePlay = () => {
+    if (isFree || unlocked) {
+      window.open(video.video_url, '_blank');
     } else {
-      await navigator.clipboard.writeText(url);
+      handleUnlock();
     }
+  };
+
+  const handleDownload = () => {
+    if (isFree || unlocked) {
+      const link = document.createElement('a');
+      link.href = video.video_url;
+      link.download = `${video.title}.mp4`;
+      link.click();
+    } else {
+      handleUnlock();
+    }
+  };
+
+  const handleShare = () => {
+    shareContent('video', video.id, video.title, video.description);
   };
 
   const canPlay = isFree || unlocked;
 
   return (
-    <div className="relative overflow-hidden rounded-2xl border border-border bg-card shadow-lg">
-        <div className="relative aspect-[9/14] w-full overflow-hidden">
-          <img src={video.thumbnail} alt={video.title} className="h-full w-full object-cover" loading="lazy" />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent" />
-          {!isFree && !unlocked && (
-            <div className="absolute right-3 top-3 flex items-center gap-1 rounded-full bg-primary/90 px-3 py-1 text-xs font-bold text-primary-foreground backdrop-blur">
-              <Lock size={12} /> {video.price_sq} SQ
-            </div>
-          )}
-          {unlocked && !isFree && (
-            <div className="absolute right-3 top-3 rounded-full bg-secondary/90 px-3 py-1 text-xs font-bold text-secondary-foreground backdrop-blur">
-              UNLOCKED
-            </div>
-          )}
-          {isFree && (
-            <div className="absolute right-3 top-3 rounded-full bg-secondary/90 px-3 py-1 text-xs font-bold text-secondary-foreground backdrop-blur">
-              FREE
-            </div>
-          )}
-          <div className="absolute left-3 top-3 rounded-md bg-black/60 px-2 py-0.5 text-xs text-white backdrop-blur">
-            {video.duration}
+    <div className="relative overflow-hidden rounded-2xl border border-border bg-card shadow-lg transition-all hover:shadow-xl hover:-translate-y-1">
+      {/* Thumbnail */}
+      <div className="relative aspect-[9/14] w-full overflow-hidden">
+        <img src={video.thumbnail} alt={video.title} className="h-full w-full object-cover" loading="lazy" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent" />
+        
+        {/* Badges */}
+        {!isFree && !unlocked && (
+          <div className="absolute right-3 top-3 flex items-center gap-1 rounded-full bg-gradient-to-r from-purple-600 to-pink-600 px-3 py-1 text-xs font-bold text-white backdrop-blur shadow-lg">
+            <i className="fas fa-coins mr-1"></i> {video.price_sq} SQ
           </div>
-          <div className="absolute bottom-0 left-0 right-0 p-4 text-white">
-            <p className="text-xs opacity-80">{video.creator}</p>
-            <h3 className="mt-0.5 text-base font-bold leading-tight">{video.title}</h3>
-            <p className="mt-1 line-clamp-2 text-xs opacity-80">{video.description}</p>
-            <div className="mt-1 flex items-center gap-1 text-[11px] opacity-70">
-              <Eye size={11} /> {video.views}
-            </div>
+        )}
+        {unlocked && !isFree && (
+          <div className="absolute right-3 top-3 rounded-full bg-green-500/90 px-3 py-1 text-xs font-bold text-white backdrop-blur shadow-lg">
+            <i className="fas fa-check-circle mr-1"></i> UNLOCKED
+          </div>
+        )}
+        {isFree && (
+          <div className="absolute right-3 top-3 rounded-full bg-green-500/90 px-3 py-1 text-xs font-bold text-white backdrop-blur shadow-lg">
+            <i className="fas fa-gift mr-1"></i> FREE
+          </div>
+        )}
+
+        {/* Duration */}
+        <div className="absolute left-3 top-3 rounded-md bg-black/60 px-2 py-0.5 text-xs text-white backdrop-blur">
+          {video.duration}
+        </div>
+
+        {/* Share button (floating) */}
+        <button
+          onClick={handleShare}
+          className="absolute left-3 bottom-16 text-white bg-black/40 rounded-full p-1.5 hover:bg-black/60 transition"
+          aria-label="Share"
+        >
+          <i className="fas fa-share-alt text-sm"></i>
+        </button>
+
+        {/* Video info */}
+        <div className="absolute bottom-0 left-0 right-0 p-4 text-white">
+          <p className="text-xs opacity-80">{video.creator}</p>
+          <h3 className="mt-0.5 text-base font-bold leading-tight line-clamp-2">{video.title}</h3>
+          <p className="mt-1 line-clamp-2 text-xs opacity-80">{video.description}</p>
+          <div className="mt-1 flex items-center gap-3 text-[11px] opacity-70">
+            <span className="flex items-center gap-1">
+              <i className="fas fa-eye text-xs"></i> {video.views}
+            </span>
+            <span className="flex items-center gap-1">
+              <i className="fas fa-clock text-xs"></i> {video.duration}
+            </span>
           </div>
         </div>
-        <div className="p-3">
-          {err && <p className="mb-2 rounded-lg bg-destructive/10 px-2 py-1 text-xs text-destructive">{err}</p>}
-          {canPlay ? (
-            <div className="grid grid-cols-3 gap-2">
-              <button className="col-span-1 flex items-center justify-center gap-1.5 rounded-xl bg-primary py-2.5 text-sm font-semibold text-primary-foreground shadow-[var(--shadow-neon)] active:scale-95">
-                <Play size={16} fill="currentColor" /> Play
-              </button>
-              <button className="col-span-1 flex items-center justify-center gap-1.5 rounded-xl border border-border bg-muted py-2.5 text-sm font-semibold text-foreground active:scale-95">
-                <Download size={16} /> Save
-              </button>
-              <button onClick={share} className="col-span-1 flex items-center justify-center gap-1.5 rounded-xl border border-border bg-muted py-2.5 text-sm font-semibold text-foreground active:scale-95">
-                <Share2 size={16} /> Share
-              </button>
-            </div>
-          ) : (
-            <div className="grid grid-cols-4 gap-2">
+      </div>
+
+      {/* Buttons - New Design */}
+      <div className="p-3 space-y-2">
+        {err && <p className="text-center text-xs text-red-500">{err}</p>}
+        
+        {canPlay ? (
+          // Unlocked or Free: Play, Download, Share
+          <>
+            <button
+              onClick={handlePlay}
+              className="w-full flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 py-3 text-sm font-bold text-white shadow-lg shadow-purple-500/30 hover:shadow-purple-500/50 transition-all hover:scale-[1.02] active:scale-95"
+            >
+              <i className="fas fa-play text-sm"></i> Play
+            </button>
+            <div className="grid grid-cols-2 gap-2">
               <button
-                onClick={handleUnlock}
-                disabled={busy}
-                className="col-span-3 flex items-center justify-center gap-1.5 rounded-xl bg-primary py-2.5 text-sm font-semibold text-primary-foreground shadow-[var(--shadow-neon)] active:scale-95 disabled:opacity-60"
+                onClick={handleDownload}
+                className="flex items-center justify-center gap-2 rounded-xl border border-border bg-muted/50 py-2.5 text-sm font-semibold text-foreground hover:bg-muted transition-all hover:scale-[1.02] active:scale-95"
               >
-                {busy ? <Loader2 size={16} className="animate-spin" /> : <Coins size={16} />}
-                Unlock {video.price_sq} SQ
+                <i className="fas fa-download text-sm"></i> Download
               </button>
-              <Link
-                to="/wallet"
-                className="col-span-1 flex items-center justify-center rounded-xl border border-border bg-muted py-2.5 text-xs font-semibold text-foreground active:scale-95"
+              <button
+                onClick={handleShare}
+                className="flex items-center justify-center gap-2 rounded-xl border border-border bg-muted/50 py-2.5 text-sm font-semibold text-foreground hover:bg-muted transition-all hover:scale-[1.02] active:scale-95"
               >
-                Top up
-              </Link>
+                <i className="fas fa-share-alt text-sm"></i> Share
+              </button>
             </div>
-          )}
-        </div>
+          </>
+        ) : (
+          // Locked: Unlock button + Top up
+          <div className="flex gap-2">
+            <button
+              onClick={handleUnlock}
+              disabled={busy}
+              className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 py-3 text-sm font-bold text-white shadow-lg shadow-purple-500/30 hover:shadow-purple-500/50 transition-all hover:scale-[1.02] active:scale-95 disabled:opacity-60"
+            >
+              {busy ? (
+                <i className="fas fa-spinner fa-spin"></i>
+              ) : (
+                <>
+                  <i className="fas fa-unlock-alt"></i> Unlock ({video.price_sq} SQ)
+                </>
+              )}
+            </button>
+            <Link
+              to="/wallet"
+              className="flex items-center justify-center px-4 rounded-xl border border-border bg-muted/50 text-sm font-semibold text-foreground hover:bg-muted transition-all hover:scale-[1.02] active:scale-95"
+            >
+              <i className="fas fa-plus-circle"></i>
+            </Link>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
