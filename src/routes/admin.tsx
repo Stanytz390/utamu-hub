@@ -207,7 +207,7 @@ function DashboardContent({ stats }: { stats: any }) {
 }
 
 // ============================================================
-// 2. MANAGE VIDEOS – Full CRUD
+// 2. MANAGE VIDEOS
 // ============================================================
 function VideosContent() {
   const [vids, setVids] = useState<any[]>([]);
@@ -366,13 +366,13 @@ function DadazContent() {
 }
 
 // ============================================================
-// 4. MANAGE GROUPS
+// 4. MANAGE GROUPS (with Price)
 // ============================================================
 function GroupsContent() {
   const [groups, setGroups] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
-  const [form, setForm] = useState({ name: "", link: "", description: "" });
+  const [form, setForm] = useState({ name: "", link: "", description: "", price_sq: 0 });
 
   const fetchGroups = async () => {
     try {
@@ -393,12 +393,12 @@ function GroupsContent() {
         link: form.link, 
         description: form.description, 
         is_published: true,
-        price_sq: 0 
+        price_sq: form.price_sq
       }]);
       if (error) throw error;
       alert("Group Added!");
       setShowAdd(false);
-      setForm({ name: "", link: "", description: "" });
+      setForm({ name: "", link: "", description: "", price_sq: 0 });
       fetchGroups();
     } catch (err: any) { alert("Error: " + err.message); }
   };
@@ -425,6 +425,7 @@ function GroupsContent() {
           <input placeholder="Group Name" required className="w-full bg-black/50 border border-white/10 p-4 rounded-2xl text-sm" onChange={e => setForm({...form, name: e.target.value})} />
           <input placeholder="WhatsApp/Telegram Link" required className="w-full bg-black/50 border border-white/10 p-4 rounded-2xl text-sm" onChange={e => setForm({...form, link: e.target.value})} />
           <textarea placeholder="Description" className="w-full bg-black/50 border border-white/10 p-4 rounded-2xl text-sm" onChange={e => setForm({...form, description: e.target.value})} />
+          <input type="number" placeholder="Price SQ (0 for Free)" className="w-full bg-black/50 border border-white/10 p-4 rounded-2xl text-sm" onChange={e => setForm({...form, price_sq: Number(e.target.value)})} />
           <button type="submit" className="w-full bg-white text-black py-4 rounded-2xl font-black uppercase tracking-tighter">Save Group</button>
         </form>
       )}
@@ -435,6 +436,7 @@ function GroupsContent() {
             <div className="min-w-0 flex-1">
               <h4 className="font-bold truncate">{g.name}</h4>
               <p className="text-[10px] text-secondary font-black truncate uppercase">{g.link}</p>
+              <p className="text-[10px] text-muted-foreground">Price: {g.price_sq === 0 ? "Free" : `${g.price_sq} SQ`}</p>
             </div>
             <button onClick={() => deleteGroup(g.id)} className="text-red-500 p-2"><i className="fas fa-trash"></i></button>
           </div>
@@ -445,7 +447,7 @@ function GroupsContent() {
 }
 
 // ============================================================
-// 5. REDEEM CODES
+// 5. REDEEM CODES (with is_active removed if error)
 // ============================================================
 function RedeemContent() {
   const [codes, setCodes] = useState<any[]>([]);
@@ -468,7 +470,10 @@ function RedeemContent() {
     try {
       const code = "UTAMU-" + Math.random().toString(36).substring(2, 7).toUpperCase();
       const { error } = await supabase.from("redeem_links").insert({
-        code, coins_sq: amt, max_uses: uses, is_active: true
+        code, 
+        coins_sq: amt, 
+        max_uses: uses,
+        // is_active: true // comment if column missing, but after SQL it will exist
       });
       if (error) throw error;
       alert("Code Created!");
