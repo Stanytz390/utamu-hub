@@ -1,201 +1,260 @@
-import { createFileRoute, useNavigate } from '@tanstack/react-router';
-import { supabase } from '@/integrations/supabase/client';
-import { useState, useEffect } from 'react';
-import { spendCoins } from '@/lib/payment';
-import { shareContent } from '@/lib/share';
+import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
+import { useState, useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
 
-export const Route = createFileRoute('/dadaz/$id')({
-  component: DadazProfile,
+export const Route = createFileRoute("/auth")({
+  component: AuthPage,
 });
 
-function DadazProfile() {
-  const { id } = Route.useParams();
+function AuthPage() {
   const navigate = useNavigate();
-  const [profile, setProfile] = useState<any>(null);
-  const [contact, setContact] = useState<any>(null);
-  const [showContact, setShowContact] = useState(false);
-  const [contactBought, setContactBought] = useState(false);
-  const [userId, setUserId] = useState<string | null>(null);
-  const [isOwner, setIsOwner] = useState(false);
+  const [mode, setMode] = useState<"signin" | "signup">("signin");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [username, setUsername] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
 
+  // Check if already logged in
   useEffect(() => {
-    const fetchData = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      const uid = user?.id || null;
-      setUserId(uid);
-      setIsOwner(uid === id);
-
-      const { data: profileData } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', id)
-        .single();
-      setProfile(profileData);
-
-      const { data: contactData } = await supabase
-        .from('business_contacts')
-        .select('*')
-        .eq('business_id', id)
-        .maybeSingle();
-      setContact(contactData);
-
-      if (uid && contactData) {
-        const { data: tx } = await supabase
-          .from('coin_transactions')
-          .select('id')
-          .eq('user_id', uid)
-          .eq('ref_id', `contact-${id}`)
-          .eq('kind', 'contact_purchase')
-          .maybeSingle();
-        if (tx) {
-          setContactBought(true);
-          setShowContact(true);
+    const checkSession = async () => {
+      const { data } = await supabase.auth.getSession();
+      if (data.session) {
+        // Auto-promote admin
+        const adminEmail = import.meta.env.VITE_ADMIN_EMAIL;
+        if (adminEmail && data.session.user?.email === adminEmail) {
+          await supabase
+            .from("user_roles")
+            .upsert(
+              { user_id: data.session.user.id, role: "admin" },
+              { onConflict: "user_id,role" }
+            );
         }
+        navigate({ to: "/", replace: true });
       }
     };
-    fetchData();
-  }, [id]);
+    checkSession();
+  }, [navigate]);
 
-  const handleBuyContact = async () => {
-    if (!userId) return alert('Please login first.');
-    if (!contact?.is_confirmed) return alert('Contact not confirmed by admin yet.');
-
-    const price = contact.contact_price || 0;
-
-    if (price === 0) {
-      setShowContact(true);
-      setContactBought(true);
-      return;
-    }
+  // Sign In
+  const handleSignIn = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setSuccess(null);
+    setLoading(true);
 
     try {
-      await spendCoins(userId, price, 'contact_purchase', `contact-${id}`, `Purchased contact for ${profile?.full_name}`);
-      setContactBought(true);
-      setShowContact(true);
-    } catch (e: any) {
-      alert('Not enough coins. Please top up.');
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) {
+        setError(error.message);
+        setLoading(false);
+        return;
+      }
+
+      // Auto-promote admin
+      const adminEmail = import.meta.env.VITE_ADMIN_EMAIL;
+      if (adminEmail && data.user?.email === adminEmail) {
+        await supabase
+          .from("user_roles")
+          .upsert(
+            { user_id: data.user.id, role: "admin" },
+            { onConflict: "user_id,role" }
+          );
+      }
+
+      setLoading(false);
+      navigate({ to: "/", replace: true });
+    } catch (err: any) {
+      setError("Network error. Please try again.");
+      setLoading(false);
     }
   };
 
-  const handleShare = () => {
-    shareContent('dadaz', id, profile?.full_name || 'Dadaz Profile', profile?.bio || '');
+  // Sign Up
+  const handleSignUp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setSuccess(null);
+    setLoading(true);
+
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            username: username || email.split("@")[0],
+          },
+        },
+      });
+
+      if (error) {
+        setError(error.message);
+        setLoading(false);
+        return;
+      }
+
+      if (data.session) {
+        // Auto-promote admin
+        const adminEmail = import.meta.env.VITE_ADMIN_EMAIL;
+        if (adminEmail && data.user?.email === adminEmail) {
+          await supabase
+            .from("user_roles")
+            .upsert(
+              { user_id: data.user.id, role: "admin" },
+              { onConflict: "user_id,role" }
+            );
+        }
+        setLoading(false);
+        navigate({ to: "/", replace: true });
+      } else {
+        setSuccess("Account created! Please check your email to confirm.");
+        setLoading(false);
+        setMode("signin");
+      }
+    } catch (err: any) {
+      setError("Network error. Please try again.");
+      setLoading(false);
+    }
   };
 
-  const handleChat = () => {
-    navigate({ to: '/inbox', search: { user: id } });
+  // GitHub OAuth
+  const handleGitHub = async () => {
+    setError(null);
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "github",
+        options: {
+          redirectTo: `${window.location.origin}/auth`,
+        },
+      });
+      if (error) setError(error.message);
+    } catch (err: any) {
+      setError("Network error. Please try again.");
+    }
   };
-
-  if (!profile) return <div className="p-6 text-center">Loading...</div>;
-
-  const contactAvailable = contact && contact.is_confirmed === true;
 
   return (
-    <div className="max-w-2xl mx-auto p-4">
-      <div className="flex items-start gap-4">
-        <img
-          src={profile.avatar_url || 'https://via.placeholder.com/100'}
-          alt={profile.full_name}
-          className="w-24 h-24 rounded-full object-cover border-2 border-purple-500"
-        />
-        <div className="flex-1">
-          <div className="flex justify-between items-start">
-            <div>
-              <h1 className="text-2xl font-bold">{profile.full_name}</h1>
-              <p className="text-gray-500 text-sm">{profile.bio || 'No bio'}</p>
-              {contact?.location && (
-                <p className="text-sm text-gray-600 mt-1">
-                  <i className="fas fa-map-marker-alt mr-1"></i> {contact.location}
-                </p>
-              )}
-            </div>
-            <button
-              onClick={handleShare}
-              className="text-gray-500 hover:text-purple-600 p-2 rounded-full hover:bg-gray-100"
-              aria-label="Share"
-            >
-              <i className="fas fa-share-alt text-xl"></i>
-            </button>
-          </div>
-          {isOwner && (
-            <button
-              onClick={() => navigate({ to: '/dashboard/story-upload' })}
-              className="mt-2 text-sm bg-purple-100 text-purple-700 px-4 py-1 rounded-full hover:bg-purple-200"
-            >
-              <i className="fas fa-plus-circle mr-1"></i> Upload Story
-            </button>
-          )}
+    <div className="mx-auto max-w-lg px-4 py-6">
+      <Link to="/" className="mb-6 inline-flex items-center gap-1 text-sm text-muted-foreground">
+        <i className="fas fa-arrow-left text-xs mr-1"></i> Back to Home
+      </Link>
+
+      <div className="mb-6 text-center">
+        <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-full bg-[image:var(--gradient-primary)] shadow-[var(--shadow-neon)]">
+          <i className="fas fa-sign-in-alt text-2xl text-primary-foreground"></i>
         </div>
+        <h1 className="bg-[image:var(--gradient-primary)] bg-clip-text text-2xl font-black text-transparent">
+          UTAMU PORI
+        </h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          {mode === "signin" ? "Sign in to your account" : "Create a new account"}
+        </p>
       </div>
 
-      {contact?.services && (
-        <div className="mt-4 p-4 border rounded-lg bg-gray-50">
-          <h3 className="font-semibold text-gray-700">
-            <i className="fas fa-concierge-bell mr-2"></i>Services & Pricing
-          </h3>
-          <p className="text-gray-600">{contact.services}</p>
-          {contact.service_prices && (
-            <div className="mt-2 text-sm">
-              {Object.entries(JSON.parse(contact.service_prices)).map(([service, price]) => (
-                <div key={service} className="flex justify-between border-b py-1">
-                  <span>{service}</span>
-                  <span className="font-medium">{price} SQ</span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
+      <button
+        onClick={handleGitHub}
+        className="mb-4 flex w-full items-center justify-center gap-2 rounded-xl border border-border bg-card py-3 font-semibold text-foreground hover:bg-muted"
+      >
+        <i className="fab fa-github text-xl"></i> Continue with GitHub
+      </button>
 
-      <div className="mt-6 space-y-4">
-        {!contactAvailable ? (
-          <div className="text-center text-gray-500 py-4 border rounded-lg">
-            <i className="fas fa-lock mr-2"></i> Contact not confirmed yet.
-          </div>
-        ) : !showContact ? (
-          <button
-            onClick={handleBuyContact}
-            className="w-full bg-purple-500 text-white py-3 rounded-xl font-semibold hover:bg-purple-600 transition flex items-center justify-center gap-2"
-          >
-            <i className="fas fa-unlock-alt"></i> View Contact ({contact.contact_price || 0} SQ)
-          </button>
-        ) : (
-          <div className="space-y-3">
-            <div className="grid grid-cols-3 gap-2">
-              {contact.whatsapp && (
-                <a
-                  href={`https://wa.me/${contact.whatsapp}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="bg-green-500 text-white py-3 rounded-xl font-semibold hover:bg-green-600 transition flex items-center justify-center gap-2"
-                >
-                  <i className="fab fa-whatsapp"></i> WhatsApp
-                </a>
-              )}
-              {contact.phone && (
-                <>
-                  <a
-                    href={`tel:${contact.phone}`}
-                    className="bg-blue-500 text-white py-3 rounded-xl font-semibold hover:bg-blue-600 transition flex items-center justify-center gap-2"
-                  >
-                    <i className="fas fa-phone"></i> Call
-                  </a>
-                  <a
-                    href={`sms:${contact.phone}`}
-                    className="bg-gray-500 text-white py-3 rounded-xl font-semibold hover:bg-gray-600 transition flex items-center justify-center gap-2"
-                  >
-                    <i className="fas fa-sms"></i> SMS
-                  </a>
-                </>
-              )}
-            </div>
-            <button
-              onClick={handleChat}
-              className="w-full bg-purple-500 text-white py-3 rounded-xl font-semibold hover:bg-purple-600 transition flex items-center justify-center gap-2"
-            >
-              <i className="fas fa-comment-dots"></i> Chat Now
-            </button>
+      <div className="mb-4 flex items-center gap-3 text-xs text-muted-foreground">
+        <span className="h-px flex-1 bg-border" /> OR <span className="h-px flex-1 bg-border" />
+      </div>
+
+      <form onSubmit={mode === "signin" ? handleSignIn : handleSignUp} className="space-y-3">
+        {mode === "signup" && (
+          <div>
+            <label className="mb-1 block text-xs text-muted-foreground">Username</label>
+            <input
+              type="text"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              placeholder="Your name"
+              className="w-full rounded-xl border border-border bg-input px-3 py-3 text-sm outline-none focus:border-primary"
+            />
           </div>
         )}
+
+        <div>
+          <label className="mb-1 block text-xs text-muted-foreground">Email</label>
+          <div className="relative">
+            <i className="fas fa-envelope absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-xs"></i>
+            <input
+              type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="you@example.com"
+              className="w-full rounded-xl border border-border bg-input py-3 pl-9 pr-3 text-sm outline-none focus:border-primary"
+            />
+          </div>
+        </div>
+
+        <div>
+          <label className="mb-1 block text-xs text-muted-foreground">Password</label>
+          <div className="relative">
+            <i className="fas fa-lock absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-xs"></i>
+            <input
+              type="password"
+              required
+              minLength={6}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="••••••••"
+              className="w-full rounded-xl border border-border bg-input py-3 pl-9 pr-3 text-sm outline-none focus:border-primary"
+            />
+          </div>
+        </div>
+
+        {error && (
+          <div className="rounded-xl bg-destructive/10 px-3 py-2 text-xs text-destructive">
+            <i className="fas fa-exclamation-circle mr-1"></i> {error}
+          </div>
+        )}
+        {success && (
+          <div className="rounded-xl bg-secondary/10 px-3 py-2 text-xs text-secondary">
+            <i className="fas fa-check-circle mr-1"></i> {success}
+          </div>
+        )}
+
+        <button
+          type="submit"
+          disabled={loading}
+          className="w-full rounded-xl bg-primary py-3 font-bold text-primary-foreground shadow-[var(--shadow-neon)] disabled:opacity-60"
+        >
+          {loading ? <i className="fas fa-spinner fa-spin mr-2"></i> : null}
+          {mode === "signin" ? "Sign In" : "Sign Up"}
+        </button>
+      </form>
+
+      <div className="mt-6 flex flex-wrap items-center justify-center gap-2 text-sm text-muted-foreground">
+        <button
+          onClick={() => {
+            setMode("signin");
+            setError(null);
+            setSuccess(null);
+          }}
+          className="font-semibold text-secondary hover:underline"
+        >
+          Sign In
+        </button>
+        <button
+          onClick={() => {
+            setMode("signup");
+            setError(null);
+            setSuccess(null);
+          }}
+          className="font-semibold text-secondary hover:underline"
+        >
+          Sign Up
+        </button>
       </div>
     </div>
   );
