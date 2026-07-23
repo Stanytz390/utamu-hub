@@ -2,14 +2,14 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Coins, ArrowUpRight, ArrowDownLeft, Loader2, Gift, Plus, Minus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { fetchWallet, fetchTransactions, fetchSetting, requestManualTopUp, type Wallet, type CoinTx } from "@/lib/wallet";
+import { fetchWallet, fetchTransactions, fetchSetting, type Wallet, type CoinTx } from "@/lib/wallet";
 import { ReferralCard } from "@/components/ReferralCard";
 
 export const Route = createFileRoute("/_authenticated/wallet")({
   head: () => ({
     meta: [
       { title: "SQ Coins Wallet · UTAMU PORI" },
-      { name: "description", content: "Angalia coins zako, top-up SQ, na historia ya matumizi." },
+      { name: "description", content: "Manage your SQ coins, top-up, and transaction history." },
     ],
   }),
   component: WalletPage,
@@ -36,6 +36,7 @@ function WalletPage() {
   const [phone, setPhone] = useState("");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+  const [paymentRef, setPaymentRef] = useState<string | null>(null);
 
   const reload = async (uid: string) => {
     const [w, t, r] = await Promise.all([
@@ -69,16 +70,45 @@ function WalletPage() {
     setAmount(newAmount);
   };
 
+  // 🔄 Updated topup function using the SpeedPesa API endpoint
   const topup = async () => {
     if (!userId || !amount || phone.length < 9) return;
     setBusy(true);
     setMsg(null);
+    setPaymentRef(null);
+
     try {
-      await requestManualTopUp(userId, amount, net.name, phone);
-      setMsg(`Request for ${amount} SQ (TSh ${(amount * sqRate).toLocaleString()}) has been placed. Payment via ${net.name} will be processed shortly.`);
-      await reload(userId);
-    } catch (e) {
-      setMsg(e instanceof Error ? e.message : "Something went wrong");
+      const tzsAmount = amount * sqRate;
+      const response = await fetch('/api/payment/initiate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId,
+          phone,
+          sqAmount: amount,
+          tzsAmount,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Payment initiation failed');
+      }
+
+      setPaymentRef(data.reference);
+      setMsg(
+        `✅ Payment request sent to ${phone}. Check your phone and complete the payment.\n` +
+        `Reference: ${data.reference}\n` +
+        `After confirmation, your wallet will be updated automatically.`
+      );
+
+      // Refresh wallet after a short delay to reflect webhook credit
+      setTimeout(() => {
+        reload(userId);
+      }, 15000); // 15 seconds – adjust as needed
+    } catch (e: any) {
+      setMsg(`❌ ${e.message || 'Something went wrong'}`);
     } finally {
       setBusy(false);
     }
@@ -175,7 +205,6 @@ function WalletPage() {
                   alt={n.name}
                   className="h-full w-full object-cover"
                   onError={(e) => {
-                    // Fallback if image fails to load
                     const target = e.target as HTMLImageElement;
                     target.style.display = "none";
                     const parent = target.parentElement;
@@ -213,7 +242,16 @@ function WalletPage() {
           Pay TSh {(amount * sqRate).toLocaleString()} via {net.name}
         </button>
 
-        {msg && <p className="mt-2 text-center text-xs text-muted-foreground">{msg}</p>}
+        {msg && (
+          <div className="mt-3 whitespace-pre-wrap rounded-xl bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
+            {msg}
+          </div>
+        )}
+        {paymentRef && (
+          <div className="mt-2 text-[10px] text-muted-foreground">
+            Reference: {paymentRef}
+          </div>
+        )}
       </section>
 
       {/* Referral Section */}
