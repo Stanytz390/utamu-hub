@@ -1,12 +1,21 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { 
+  LayoutDashboard, Video, Users, UserCheck, 
+  Gift, Settings, Plus, Trash2, Edit, 
+  Menu, X, CheckCircle, Clock, ExternalLink,
+  ChevronRight, Save, Phone, Coins
+} from "lucide-react";
 import { toast, Toaster } from "sonner";
 
+// ============================================================
+// ROUTE PROTECTION
+// ============================================================
 export const Route = createFileRoute("/admin")({
   beforeLoad: async () => {
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error("Log in kwanza mkuu.");
+    if (!user) throw new Error("Please login first");
 
     const { data: roleData } = await supabase
       .from("user_roles")
@@ -15,165 +24,191 @@ export const Route = createFileRoute("/admin")({
       .eq("role", "admin")
       .maybeSingle();
 
-    if (!roleData) {
-      throw new Error("Wewe siyo Admin!");
-    }
+    if (!roleData) throw new Error("Unauthorized Access");
     return { user };
   },
   component: AdminDashboard,
 });
 
+// ============================================================
+// MAIN COMPONENT (RESPONSIVE)
+// ============================================================
 function AdminDashboard() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("dashboard");
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
-  const tabs = [
-    { id: "dashboard", label: "Overview", icon: "fa-chart-line" },
-    { id: "videos", label: "Manage Videos", icon: "fa-video" },
-    { id: "groups", label: "Manage Groups", icon: "fa-users-cog" },
-    { id: "business", label: "Dadaz (Profiles)", icon: "fa-female" },
-    { id: "redeem", label: "Redeem Codes", icon: "fa-gift" },
-    { id: "settings", label: "App Settings", icon: "fa-cogs" },
+  const menuItems = [
+    { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
+    { id: "videos", label: "Utamu Videos", icon: Video },
+    { id: "dadaz", label: "Manage Dadaz", icon: UserCheck },
+    { id: "groups", label: "Manage Groups", icon: Users },
+    { id: "redeem", label: "Redeem Codes", icon: Gift },
+    { id: "settings", label: "App Settings", icon: Settings },
   ];
 
+  const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
+
   return (
-    <div className="flex min-h-screen bg-[#0a0a0a] text-white">
-      <Toaster position="top-right" richColors />
+    <div className="flex min-h-screen bg-[#050505] text-white font-sans">
+      <Toaster position="top-center" richColors />
       
-      {/* Sidebar */}
-      <aside className="w-64 bg-[#141414] border-r border-white/10 flex flex-col hidden md:flex">
-        <div className="p-6 border-b border-white/10 bg-gradient-to-r from-pink-600 to-purple-600">
-          <h1 className="text-xl font-black italic tracking-tighter">UTAMU ADMIN</h1>
+      {/* Mobile Navbar */}
+      <div className="md:hidden fixed top-0 left-0 right-0 z-50 bg-[#111] border-b border-white/5 p-4 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <button onClick={toggleSidebar} className="p-2 bg-white/5 rounded-lg text-primary">
+            {isSidebarOpen ? <X size={20} /> : <Menu size={20} />}
+          </button>
+          <span className="font-black italic text-sm tracking-tighter uppercase">Admin Panel</span>
         </div>
-        <nav className="flex-1 p-4 space-y-2">
-          {tabs.map((tab) => (
+        <button onClick={() => navigate({ to: "/" })} className="text-xs font-bold text-muted-foreground">Exit</button>
+      </div>
+
+      {/* Sidebar Overlay (Mobile) */}
+      {isSidebarOpen && (
+        <div className="fixed inset-0 bg-black/80 z-40 md:hidden" onClick={toggleSidebar} />
+      )}
+
+      {/* Sidebar */}
+      <aside className={`
+        fixed md:relative z-50 w-64 h-full bg-[#111] border-r border-white/5 transform transition-transform duration-300
+        ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"} md:translate-x-0
+      `}>
+        <div className="p-6 border-b border-white/5 hidden md:block">
+          <h1 className="text-xl font-black italic tracking-tighter text-transparent bg-clip-text bg-[image:var(--gradient-primary)]">UTAMU PORI</h1>
+          <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-1">Super Administrator</p>
+        </div>
+        
+        <nav className="p-4 space-y-1.5 mt-16 md:mt-0">
+          {menuItems.map((item) => (
             <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center w-full gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-all ${
-                activeTab === tab.id ? "bg-primary text-white shadow-neon" : "text-muted-foreground hover:bg-white/5"
-              }`}
+              key={item.id}
+              onClick={() => { setActiveTab(item.id); setIsSidebarOpen(false); }}
+              className={`flex items-center w-full gap-3 px-4 py-3.5 rounded-2xl text-sm font-bold transition-all
+                ${activeTab === item.id ? "bg-primary text-white shadow-[0_0_20px_rgba(254,44,85,0.3)]" : "text-muted-foreground hover:bg-white/5"}
+              `}
             >
-              <i className={`fas ${tab.icon} w-5 text-center`}></i>
-              {tab.label}
+              <item.icon size={18} />
+              {item.label}
             </button>
           ))}
         </nav>
+
+        <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-white/5">
+           <button onClick={() => supabase.auth.signOut().then(() => navigate({to: '/auth'}))} className="flex items-center gap-3 w-full px-4 py-3 text-sm font-bold text-red-400 hover:bg-red-500/10 rounded-2xl transition-all">
+             <X size={18} /> Logout
+           </button>
+        </div>
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-y-auto p-4 md:p-8">
-        {activeTab === "dashboard" && <DashboardOverview />}
-        {activeTab === "videos" && <ManageVideos />}
-        {activeTab === "groups" && <ManageGroups />}
-        {activeTab === "business" && <ManageDadaz />}
-        {activeTab === "settings" && <AppSettings />}
-        {activeTab === "redeem" && <ManageRedeem />}
+      <main className="flex-1 w-full p-4 md:p-10 mt-16 md:mt-0 overflow-x-hidden">
+        <header className="mb-8 hidden md:block">
+          <h2 className="text-3xl font-black">{menuItems.find(m => m.id === activeTab)?.label}</h2>
+          <p className="text-muted-foreground text-sm">Welcome back, Boss Stanlee.</p>
+        </header>
+
+        <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+          {activeTab === "dashboard" && <DashboardContent />}
+          {activeTab === "videos" && <VideosContent />}
+          {activeTab === "dadaz" && <DadazContent />}
+          {activeTab === "groups" && <GroupsContent />}
+          {activeTab === "redeem" && <RedeemContent />}
+          {activeTab === "settings" && <SettingsContent />}
+        </div>
       </main>
     </div>
   );
 }
 
-// --- SUB-COMPONENTS ---
-
-function DashboardOverview() {
-  const [stats, setStats] = useState({ users: 0, videos: 0, sales: 0 });
+// ============================================================
+// 1. DASHBOARD OVERVIEW
+// ============================================================
+function DashboardContent() {
+  const [stats, setStats] = useState({ users: 0, vids: 0, groups: 0, dadaz: 0 });
 
   useEffect(() => {
-    const load = async () => {
+    const fetch = async () => {
       const { count: u } = await supabase.from("profiles").select("*", { count: "exact", head: true });
       const { count: v } = await supabase.from("videos").select("*", { count: "exact", head: true });
-      setStats({ users: u || 0, videos: v || 0, sales: 0 });
+      const { count: g } = await supabase.from("groups").select("*", { count: "exact", head: true });
+      const { count: d } = await supabase.from("dadaz_profiles").select("*", { count: "exact", head: true });
+      setStats({ users: u||0, vids: v||0, groups: g||0, dadaz: d||0 });
     };
-    load();
+    fetch();
   }, []);
 
+  const cards = [
+    { label: "Users", value: stats.users, icon: Users, color: "text-blue-400" },
+    { label: "Videos", value: stats.vids, icon: Video, color: "text-primary" },
+    { label: "Groups", value: stats.groups, icon: ExternalLink, color: "text-secondary" },
+    { label: "Dadaz", value: stats.dadaz, icon: UserCheck, color: "text-purple-400" },
+  ];
+
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-      <div className="bg-card p-6 rounded-3xl border border-white/10 shadow-xl">
-        <i className="fas fa-users text-primary text-3xl mb-4"></i>
-        <h3 className="text-muted-foreground text-xs font-bold uppercase">Total Users</h3>
-        <p className="text-4xl font-black">{stats.users}</p>
-      </div>
-      <div className="bg-card p-6 rounded-3xl border border-white/10 shadow-xl">
-        <i className="fas fa-play-circle text-secondary text-3xl mb-4"></i>
-        <h3 className="text-muted-foreground text-xs font-bold uppercase">Videos Live</h3>
-        <p className="text-4xl font-black">{stats.videos}</p>
-      </div>
-      <div className="bg-card p-6 rounded-3xl border border-white/10 shadow-xl">
-        <i className="fas fa-coins text-yellow-500 text-3xl mb-4"></i>
-        <h3 className="text-muted-foreground text-xs font-bold uppercase">SQ Sales</h3>
-        <p className="text-4xl font-black">0</p>
-      </div>
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-6">
+      {cards.map((c, i) => (
+        <div key={i} className="bg-[#111] p-5 rounded-3xl border border-white/5 shadow-xl">
+          <c.icon className={`${c.color} mb-3`} size={24} />
+          <p className="text-2xl font-black">{c.value}</p>
+          <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">{c.label}</p>
+        </div>
+      ))}
     </div>
   );
 }
 
-function ManageVideos() {
-  const [videos, setVideos] = useState<any[]>([]);
+// ============================================================
+// 2. MANAGE VIDEOS
+// ============================================================
+function VideosContent() {
+  const [vids, setVids] = useState<any[]>([]);
   const [showAdd, setShowAdd] = useState(false);
-  const [form, setForm] = useState({ title: "", video_url: "", price_sq: 0, thumbnail_url: "" });
+  const [form, setForm] = useState({ title: "", video_url: "", thumbnail_url: "", price_sq: 0 });
 
   const fetchVids = async () => {
     const { data } = await supabase.from("videos").select("*").order("created_at", { ascending: false });
-    setVideos(data || []);
+    setVids(data || []);
   };
-
   useEffect(() => { fetchVids(); }, []);
 
-  const handleAdd = async (e: any) => {
+  const save = async (e: any) => {
     e.preventDefault();
-    const { error } = await supabase.from("videos").insert([{ 
-        ...form, 
-        status: "available",
-        price_tsh: form.price_sq * 100 // 1 SQ = 100 TSh logic
-    }]);
+    const { error } = await supabase.from("videos").insert([{ ...form, status: "available", price_tsh: form.price_sq * 100 }]);
     if (error) toast.error(error.message);
-    else {
-        toast.success("Video imeongezwa!");
-        setShowAdd(false);
-        fetchVids();
-    }
+    else { toast.success("Video Added!"); setShowAdd(false); fetchVids(); }
   };
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-black">Videos</h2>
-        <button onClick={() => setShowAdd(!showAdd)} className="bg-primary px-6 py-2 rounded-full font-bold text-sm shadow-neon">
-          {showAdd ? "Funga" : "+ Add Video"}
-        </button>
-      </div>
+      <button onClick={() => setShowAdd(!showAdd)} className="w-full md:w-auto bg-primary py-4 px-8 rounded-2xl font-black flex items-center justify-center gap-2 shadow-neon transition-transform active:scale-95">
+        {showAdd ? <X size={20}/> : <Plus size={20}/>} {showAdd ? "CANCEL" : "ADD NEW VIDEO"}
+      </button>
 
       {showAdd && (
-        <form onSubmit={handleAdd} className="bg-card p-6 rounded-3xl border border-white/10 space-y-4 max-w-xl">
-          <input placeholder="Video Title" className="w-full bg-black/50 border border-white/10 p-3 rounded-xl text-sm" 
-            onChange={e => setForm({...form, title: e.target.value})} required />
-          <input placeholder="Video URL (Direct link .mp4)" className="w-full bg-black/50 border border-white/10 p-3 rounded-xl text-sm" 
-            onChange={e => setForm({...form, video_url: e.target.value})} required />
-          <input placeholder="Thumbnail URL" className="w-full bg-black/50 border border-white/10 p-3 rounded-xl text-sm" 
-            onChange={e => setForm({...form, thumbnail_url: e.target.value})} />
-          <input type="number" placeholder="Price in SQ (0 for Free)" className="w-full bg-black/50 border border-white/10 p-3 rounded-xl text-sm" 
-            onChange={e => setForm({...form, price_sq: Number(e.target.value)})} required />
-          <button className="w-full bg-secondary text-black font-black py-3 rounded-xl uppercase tracking-tighter">Publish Video</button>
+        <form onSubmit={save} className="bg-[#111] p-6 rounded-3xl border border-primary/20 space-y-4 max-w-2xl">
+          <input placeholder="Title" required className="w-full bg-black/50 border border-white/10 p-4 rounded-2xl text-sm" onChange={e => setForm({...form, title: e.target.value})} />
+          <input placeholder="Video MP4 Link" required className="w-full bg-black/50 border border-white/10 p-4 rounded-2xl text-sm" onChange={e => setForm({...form, video_url: e.target.value})} />
+          <input placeholder="Thumbnail Image Link" className="w-full bg-black/50 border border-white/10 p-4 rounded-2xl text-sm" onChange={e => setForm({...form, thumbnail_url: e.target.value})} />
+          <input type="number" placeholder="Price SQ (0 for Free)" className="w-full bg-black/50 border border-white/10 p-4 rounded-2xl text-sm" onChange={e => setForm({...form, price_sq: Number(e.target.value)})} />
+          <button className="w-full bg-white text-black py-4 rounded-2xl font-black uppercase tracking-tighter">Publish Now</button>
         </form>
       )}
 
-      <div className="grid grid-cols-1 gap-3">
-        {videos.map(v => (
-          <div key={v.id} className="bg-card p-4 rounded-2xl border border-white/5 flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <img src={v.thumbnail_url || "https://via.placeholder.com/50"} className="w-12 h-12 rounded-lg object-cover" />
-              <div>
-                <p className="font-bold text-sm">{v.title}</p>
-                <p className="text-[10px] text-muted-foreground uppercase">{v.price_sq} SQ · {v.status}</p>
-              </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {vids.map(v => (
+          <div key={v.id} className="bg-[#111] rounded-3xl border border-white/5 overflow-hidden group">
+            <div className="relative aspect-video">
+              <img src={v.thumbnail_url || "https://via.placeholder.com/300x200"} className="w-full h-full object-cover" />
+              <div className="absolute top-2 right-2 bg-black/60 backdrop-blur-md px-2 py-1 rounded-lg text-[10px] font-bold">{v.price_sq} SQ</div>
             </div>
-            <button onClick={async () => { 
-                await supabase.from("videos").delete().eq("id", v.id);
-                fetchVids();
-                toast.error("Imeondolewa");
-            }} className="text-red-500 p-2"><i className="fas fa-trash"></i></button>
+            <div className="p-4 flex items-center justify-between">
+               <div className="min-w-0 flex-1">
+                  <p className="font-bold text-sm truncate">{v.title}</p>
+                  <p className="text-[10px] text-muted-foreground uppercase">{v.views_count} Views</p>
+               </div>
+               <button onClick={async () => { if(confirm("Futa?")) { await supabase.from("videos").delete().eq("id", v.id); fetchVids(); }}} className="text-red-500 p-2 hover:bg-red-500/10 rounded-xl transition-colors"><Trash2 size={18} /></button>
+            </div>
           </div>
         ))}
       </div>
@@ -181,38 +216,241 @@ function ManageVideos() {
   );
 }
 
-function ManageDadaz() {
-    return <div className="p-10 text-center text-muted-foreground italic">Sehemu ya Dadaz inakuja hapa...</div>;
-}
+// ============================================================
+// 3. MANAGE DADAZ (BUSINESS PROFILES)
+// ============================================================
+function DadazContent() {
+  const [dadaz, setDadaz] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-function AppSettings() {
-    const [rate, setRate] = useState("100");
+  const fetchDadaz = async () => {
+    setLoading(true);
+    const { data } = await supabase.from("dadaz_profiles").select("*").order("created_at", { ascending: false });
+    setDadaz(data || []);
+    setLoading(false);
+  };
+  useEffect(() => { fetchDadaz(); }, []);
 
-    const save = async () => {
-        await supabase.from("app_settings").upsert({ key: "sq_to_tsh", value: rate });
-        toast.success("Settings zimehifadhiwa!");
-    };
+  const toggleApproval = async (id: string, current: boolean) => {
+    await supabase.from("dadaz_profiles").update({ is_admin_approved: !current }).eq("id", id);
+    fetchDadaz();
+    toast.success(!current ? "Dada amekuwa Approved!" : "Ume-unapprove profile");
+  };
 
-    return (
-        <div className="max-w-md space-y-6">
-            <h2 className="text-2xl font-black">Settings</h2>
-            <div className="bg-card p-6 rounded-3xl border border-white/10 space-y-4">
-                <div>
-                    <label className="text-xs font-bold text-muted-foreground uppercase ml-1">SQ to TSh Exchange Rate</label>
-                    <input value={rate} onChange={e => setRate(e.target.value)} className="w-full bg-black/50 border border-white/10 p-3 rounded-xl mt-1" />
-                </div>
-                <button onClick={save} className="w-full bg-primary font-black py-3 rounded-xl shadow-neon">SAVE SETTINGS</button>
-            </div>
-        </div>
-    );
-}
-
-function ManageRedeem() { return null; }
-
-function Loading() {
   return (
-    <div className="flex justify-center items-center h-32">
-      <i className="fas fa-spinner fa-spin text-2xl text-primary"></i>
+    <div className="space-y-4">
+      <div className="flex items-center justify-between mb-4">
+        <p className="text-sm font-bold text-muted-foreground">Total: {dadaz.length}</p>
+        <button onClick={fetchDadaz} className="p-2 bg-white/5 rounded-xl"><Clock size={16} /></button>
+      </div>
+
+      <div className="space-y-3">
+        {dadaz.map(d => (
+          <div key={d.id} className="bg-[#111] p-4 rounded-3xl border border-white/5 flex flex-col sm:flex-row gap-4 items-center">
+            <img src={d.avatar_url || "https://via.placeholder.com/100"} className="w-16 h-16 rounded-full border-2 border-primary object-cover" />
+            <div className="flex-1 text-center sm:text-left min-w-0">
+               <h4 className="font-black text-lg italic">@{d.username}</h4>
+               <p className="text-xs text-muted-foreground truncate">{d.bio || "No bio set"}</p>
+               <div className="mt-2 flex flex-wrap justify-center sm:justify-start gap-2">
+                  <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase ${d.is_admin_approved ? "bg-green-500/20 text-green-400" : "bg-yellow-500/20 text-yellow-400"}`}>
+                    {d.is_admin_approved ? "Verified" : "Pending"}
+                  </span>
+                  <span className="bg-white/5 px-2 py-0.5 rounded-full text-[9px] font-bold text-muted-foreground uppercase">{d.location || "TZ"}</span>
+               </div>
+            </div>
+            <div className="flex gap-2 w-full sm:w-auto">
+              <button 
+                onClick={() => toggleApproval(d.id, d.is_admin_approved)}
+                className={`flex-1 sm:flex-initial p-3 rounded-2xl transition-all ${d.is_admin_approved ? "bg-red-500/10 text-red-400" : "bg-green-500/20 text-green-400"}`}
+              >
+                {d.is_admin_approved ? <X size={20} /> : <CheckCircle size={20} />}
+              </button>
+              <button 
+                 onClick={async () => { if(confirm("Delete dada huyu?")) { await supabase.from("dadaz_profiles").delete().eq("id", d.id); fetchDadaz(); }}}
+                 className="flex-1 sm:flex-initial p-3 bg-red-500/10 text-red-500 rounded-2xl"
+              >
+                <Trash2 size={20} />
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// 4. MANAGE GROUPS
+// ============================================================
+function GroupsContent() {
+  const [groups, setGroups] = useState<any[]>([]);
+  const [showAdd, setShowAdd] = useState(false);
+  const [form, setForm] = useState({ name: "", link: "", description: "", price_sq: 0 });
+
+  const fetchGroups = async () => {
+    const { data } = await supabase.from("groups").select("*").order("created_at", { ascending: false });
+    setGroups(data || []);
+  };
+  useEffect(() => { fetchGroups(); }, []);
+
+  const save = async (e: any) => {
+    e.preventDefault();
+    const { error } = await supabase.from("groups").insert([{ ...form, is_published: true }]);
+    if (error) toast.error(error.message);
+    else { toast.success("Group Added!"); setShowAdd(false); fetchGroups(); }
+  };
+
+  return (
+    <div className="space-y-6">
+       <button onClick={() => setShowAdd(!showAdd)} className="w-full md:w-auto bg-secondary text-black py-4 px-8 rounded-2xl font-black flex items-center justify-center gap-2 active:scale-95 transition-all">
+        {showAdd ? <X size={20}/> : <Plus size={20}/>} {showAdd ? "CANCEL" : "ADD NEW GROUP"}
+      </button>
+
+      {showAdd && (
+        <form onSubmit={save} className="bg-[#111] p-6 rounded-3xl border border-secondary/20 space-y-4 max-w-2xl">
+          <input placeholder="Group Name" required className="w-full bg-black/50 border border-white/10 p-4 rounded-2xl text-sm" onChange={e => setForm({...form, name: e.target.value})} />
+          <input placeholder="WhatsApp/Telegram Link" required className="w-full bg-black/50 border border-white/10 p-4 rounded-2xl text-sm" onChange={e => setForm({...form, link: e.target.value})} />
+          <textarea placeholder="Description" className="w-full bg-black/50 border border-white/10 p-4 rounded-2xl text-sm" onChange={e => setForm({...form, description: e.target.value})} />
+          <button className="w-full bg-white text-black py-4 rounded-2xl font-black uppercase tracking-tighter">Save Group</button>
+        </form>
+      )}
+
+      <div className="space-y-3">
+        {groups.map(g => (
+          <div key={g.id} className="bg-[#111] p-4 rounded-3xl border border-white/5 flex items-center justify-between">
+            <div className="min-w-0 flex-1">
+              <h4 className="font-bold truncate">{g.name}</h4>
+              <p className="text-[10px] text-secondary font-black truncate uppercase">{g.link}</p>
+            </div>
+            <button onClick={async () => { await supabase.from("groups").delete().eq("id", g.id); fetchGroups(); }} className="text-red-500 p-2"><Trash2 size={18} /></button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// 5. REDEEM CODES
+// ============================================================
+function RedeemContent() {
+  const [codes, setCodes] = useState<any[]>([]);
+  const [amt, setAmt] = useState(10);
+  const [uses, setUses] = useState(1);
+
+  const fetchCodes = async () => {
+    const { data } = await supabase.from("redeem_links").select("*").order("created_at", { ascending: false });
+    setCodes(data || []);
+  };
+  useEffect(() => { fetchCodes(); }, []);
+
+  const generate = async () => {
+    const code = "UTAMU-" + Math.random().toString(36).substring(2, 7).toUpperCase();
+    const { error } = await supabase.from("redeem_links").insert({
+        code, coins_sq: amt, max_uses: uses, is_active: true
+    });
+    if (error) toast.error(error.message);
+    else { toast.success("Code Created!"); fetchCodes(); }
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="bg-[#111] p-6 rounded-3xl border border-white/5 space-y-4 max-w-xl">
+        <h3 className="font-black text-lg">Generate Voucher</h3>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="text-[10px] font-bold text-muted-foreground uppercase ml-1">Coins (SQ)</label>
+            <input type="number" value={amt} onChange={e => setAmt(Number(e.target.value))} className="w-full bg-black/50 border border-white/10 p-4 rounded-2xl mt-1" />
+          </div>
+          <div>
+             <label className="text-[10px] font-bold text-muted-foreground uppercase ml-1">Max Uses</label>
+             <input type="number" value={uses} onChange={e => setUses(Number(e.target.value))} className="w-full bg-black/50 border border-white/10 p-4 rounded-2xl mt-1" />
+          </div>
+        </div>
+        <button onClick={generate} className="w-full bg-primary py-4 rounded-2xl font-black shadow-neon">GENERATE CODE</button>
+      </div>
+
+      <div className="bg-[#111] rounded-3xl border border-white/5 overflow-hidden">
+        <table className="w-full text-xs text-left">
+          <thead className="bg-white/5">
+            <tr>
+              <th className="p-4">CODE</th>
+              <th className="p-4">SQ</th>
+              <th className="p-4">USES</th>
+              <th className="p-4"></th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-white/5">
+            {codes.map(c => (
+              <tr key={c.id}>
+                <td className="p-4 font-mono text-primary font-bold">{c.code}</td>
+                <td className="p-4 font-black">{c.coins_sq}</td>
+                <td className="p-4 text-muted-foreground">{c.uses_count}/{c.max_uses}</td>
+                <td className="p-4 text-right">
+                  <button onClick={async () => { await supabase.from("redeem_links").delete().eq("id", c.id); fetchCodes(); }} className="text-red-500"><Trash2 size={14} /></button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// 6. APP SETTINGS
+// ============================================================
+function SettingsContent() {
+  const [settings, setSettings] = useState<any>({});
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetch = async () => {
+      const { data } = await supabase.from("app_settings").select("*");
+      const s: any = {};
+      data?.forEach(item => s[item.key] = item.value);
+      setSettings(s);
+      setLoading(false);
+    };
+    fetch();
+  }, []);
+
+  const save = async (key: string, value: any) => {
+    const { error } = await supabase.from("app_settings").upsert({ key, value });
+    if (error) toast.error(error.message);
+    else toast.success(`Updated ${key}!`);
+  };
+
+  if (loading) return <p className="p-10 text-center animate-pulse">Loading...</p>;
+
+  return (
+    <div className="space-y-6 max-w-2xl">
+      <div className="bg-[#111] p-6 rounded-3xl border border-white/5 space-y-6">
+        <div>
+           <label className="text-[10px] font-black uppercase text-primary ml-1 tracking-widest">SQ to TSh Rate (1 SQ = ? TSh)</label>
+           <div className="flex gap-2 mt-2">
+             <input value={settings.sq_to_tsh || "100"} onChange={e => setSettings({...settings, sq_to_tsh: e.target.value})} className="flex-1 bg-black/50 border border-white/10 p-4 rounded-2xl" />
+             <button onClick={() => save("sq_to_tsh", settings.sq_to_tsh)} className="bg-white text-black px-6 rounded-2xl font-bold"><Save size={18} /></button>
+           </div>
+        </div>
+
+        <div>
+           <label className="text-[10px] font-black uppercase text-secondary ml-1 tracking-widest">Support WhatsApp Number</label>
+           <div className="flex gap-2 mt-2">
+             <input value={settings.support_whatsapp || ""} onChange={e => setSettings({...settings, support_whatsapp: e.target.value})} placeholder="+255..." className="flex-1 bg-black/50 border border-white/10 p-4 rounded-2xl" />
+             <button onClick={() => save("support_whatsapp", settings.support_whatsapp)} className="bg-white text-black px-6 rounded-2xl font-bold"><Save size={18} /></button>
+           </div>
+        </div>
+        
+        <div>
+           <label className="text-[10px] font-black uppercase text-purple-400 ml-1 tracking-widest">WhatsApp Channel Link</label>
+           <div className="flex gap-2 mt-2">
+             <input value={settings.whatsapp_channel || ""} onChange={e => setSettings({...settings, whatsapp_channel: e.target.value})} placeholder="https://chat.whatsapp..." className="flex-1 bg-black/50 border border-white/10 p-4 rounded-2xl" />
+             <button onClick={() => save("whatsapp_channel", settings.whatsapp_channel)} className="bg-white text-black px-6 rounded-2xl font-bold"><Save size={18} /></button>
+           </div>
+        </div>
+      </div>
     </div>
   );
 }
