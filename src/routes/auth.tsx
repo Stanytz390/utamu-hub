@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/auth")({
-  validateSearch: (s: Record<string, unknown>) => ({ 
+  validateSearch: (s: Record<string, unknown>) => ({
     ref: typeof s.ref === "string" ? s.ref : undefined,
     magic: typeof s.magic === "string" ? s.magic : undefined,
   }),
@@ -27,22 +27,32 @@ function AuthPage() {
   const [err, setErr] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
 
-  // Handle magic link verification on page load
+  // Check for existing session on load
   useEffect(() => {
-    if (magic) {
-      // Magic link callback – Supabase handles this automatically if redirectTo is set
-      // We'll just show a success message and redirect
-      setInfo("Magic link verified! You are now signed in.");
-      setTimeout(() => navigate({ to: "/" }), 2000);
+    const checkSession = async () => {
+      const { data } = await supabase.auth.getSession();
+      if (data.session) {
+        navigate({ to: "/", replace: true });
+      }
+    };
+    checkSession();
+  }, [navigate]);
+
+  // Handle magic link callback
+  useEffect(() => {
+    if (magic === "true") {
+      // The session is automatically set by Supabase; we just need to redirect
+      const check = async () => {
+        const { data } = await supabase.auth.getSession();
+        if (data.session) {
+          navigate({ to: "/", replace: true });
+        } else {
+          setErr("Magic link verification failed. Please try again.");
+        }
+      };
+      check();
     }
   }, [magic, navigate]);
-
-  // Redirect if already logged in
-  useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      if (data.user) navigate({ to: "/", replace: true });
-    });
-  }, [navigate]);
 
   // Sign in with email + password
   const handleSignIn = async (e: React.FormEvent) => {
@@ -54,14 +64,14 @@ function AuthPage() {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
       navigate({ to: "/", replace: true });
-    } catch (e: unknown) {
-      setErr(e instanceof Error ? e.message : "Sign in failed");
+    } catch (e: any) {
+      setErr(e.message || "Sign in failed");
     } finally {
       setLoading(false);
     }
   };
 
-  // Sign up with email + password
+  // Sign up with email + password (sends magic link for confirmation)
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     setErr(null);
@@ -73,17 +83,17 @@ function AuthPage() {
         password,
         options: {
           emailRedirectTo: `${window.location.origin}/auth?magic=true`,
-          data: { 
+          data: {
             username: username || email.split("@")[0],
-            referral_code: ref ?? null 
+            referral_code: ref ?? null,
           },
         },
       });
       if (error) throw error;
-      if (ref && typeof window !== "undefined") sessionStorage.setItem("pending_ref", ref);
-      setInfo("Account created! Check your email for a magic link to verify and sign in.");
-    } catch (e: unknown) {
-      setErr(e instanceof Error ? e.message : "Sign up failed");
+      if (ref) sessionStorage.setItem("pending_ref", ref);
+      setInfo("Account created! Check your email for a confirmation link.");
+    } catch (e: any) {
+      setErr(e.message || "Sign up failed");
     } finally {
       setLoading(false);
     }
@@ -104,31 +114,27 @@ function AuthPage() {
       });
       if (error) throw error;
       setInfo("Magic link sent! Check your email to sign in.");
-    } catch (e: unknown) {
-      setErr(e instanceof Error ? e.message : "Failed to send magic link");
+    } catch (e: any) {
+      setErr(e.message || "Failed to send magic link");
     } finally {
       setLoading(false);
     }
   };
 
-  // GitHub OAuth (no card required)
+  // GitHub OAuth
   const handleGitHub = async () => {
     setErr(null);
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: "github",
-      options: {
-        redirectTo: `${window.location.origin}/auth?magic=true`,
-      },
-    });
-    if (error) setErr(error.message);
-  };
-
-  // Switch mode and clear messages
-  const switchMode = (newMode: "signin" | "signup" | "magic") => {
-    setMode(newMode);
-    setErr(null);
-    setInfo(null);
-    setPassword("");
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "github",
+        options: {
+          redirectTo: `${window.location.origin}/auth?magic=true`,
+        },
+      });
+      if (error) throw error;
+    } catch (e: any) {
+      setErr(e.message || "GitHub login failed");
+    }
   };
 
   return (
@@ -151,7 +157,7 @@ function AuthPage() {
         </p>
       </div>
 
-      {/* GitHub OAuth Button */}
+      {/* GitHub Button */}
       <button
         onClick={handleGitHub}
         className="mb-4 flex w-full items-center justify-center gap-2 rounded-xl border border-border bg-card py-3 font-semibold text-foreground hover:bg-muted"
@@ -163,8 +169,10 @@ function AuthPage() {
         <span className="h-px flex-1 bg-border" /> OR <span className="h-px flex-1 bg-border" />
       </div>
 
-      {/* Auth Form */}
-      <form onSubmit={mode === "signin" ? handleSignIn : mode === "signup" ? handleSignUp : handleMagicLink} className="space-y-3">
+      <form
+        onSubmit={mode === "signin" ? handleSignIn : mode === "signup" ? handleSignUp : handleMagicLink}
+        className="space-y-3"
+      >
         {mode === "signup" && (
           <div>
             <label className="mb-1 block text-xs text-muted-foreground">Username</label>
@@ -211,12 +219,8 @@ function AuthPage() {
           </div>
         )}
 
-        {err && (
-          <p className="rounded-xl bg-destructive/10 px-3 py-2 text-xs text-destructive">{err}</p>
-        )}
-        {info && (
-          <p className="rounded-xl bg-secondary/10 px-3 py-2 text-xs text-secondary">{info}</p>
-        )}
+        {err && <p className="rounded-xl bg-destructive/10 px-3 py-2 text-xs text-destructive">{err}</p>}
+        {info && <p className="rounded-xl bg-secondary/10 px-3 py-2 text-xs text-secondary">{info}</p>}
 
         <button
           type="submit"
@@ -230,36 +234,16 @@ function AuthPage() {
         </button>
       </form>
 
-      {/* Mode Switcher */}
       <div className="mt-6 flex flex-wrap items-center justify-center gap-2 text-sm text-muted-foreground">
-        {mode !== "signin" && (
-          <button onClick={() => switchMode("signin")} className="font-semibold text-secondary hover:underline">
-            Sign In
-          </button>
-        )}
-        {mode !== "signup" && (
-          <button onClick={() => switchMode("signup")} className="font-semibold text-secondary hover:underline">
-            Sign Up
-          </button>
-        )}
-        {mode !== "magic" && (
-          <button onClick={() => switchMode("magic")} className="font-semibold text-secondary hover:underline">
-            Magic Link
-          </button>
-        )}
-      </div>
-
-      {/* Help Text */}
-      <div className="mt-4 text-center text-xs text-muted-foreground">
-        {mode === "magic" && (
-          <p>We'll email you a secure link to sign in instantly.</p>
-        )}
-        {mode === "signin" && (
-          <p>Don't have an account? <button onClick={() => switchMode("signup")} className="font-semibold text-secondary">Sign Up</button></p>
-        )}
-        {mode === "signup" && (
-          <p>Already have an account? <button onClick={() => switchMode("signin")} className="font-semibold text-secondary">Sign In</button></p>
-        )}
+        <button onClick={() => setMode("signin")} className="font-semibold text-secondary hover:underline">
+          Sign In
+        </button>
+        <button onClick={() => setMode("signup")} className="font-semibold text-secondary hover:underline">
+          Sign Up
+        </button>
+        <button onClick={() => setMode("magic")} className="font-semibold text-secondary hover:underline">
+          Magic Link
+        </button>
       </div>
     </div>
   );
