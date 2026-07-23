@@ -3,7 +3,6 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/auth")({
-  // Capture the referral code from the URL (?ref=CODE)
   validateSearch: (search: Record<string, unknown>) => {
     return {
       ref: (search.ref as string) || undefined,
@@ -24,34 +23,17 @@ function AuthPage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  // Updated Admin Email
   const ADMIN_EMAIL = "officialstanlee143@gmail.com";
 
-  // Handle referral logic and session checking
   useEffect(() => {
-    // 1. Store referral code in sessionStorage if present in URL
-    if (search.ref) {
-      sessionStorage.setItem("pending_ref", search.ref);
-    }
-
-    // 2. Redirect if already logged in
+    if (search.ref) sessionStorage.setItem("pending_ref", search.ref);
     const checkSession = async () => {
       const { data } = await supabase.auth.getSession();
-      if (data.session) {
-        // Auto-promote to admin if email matches
-        if (data.session.user?.email === ADMIN_EMAIL) {
-          await supabase.from("user_roles").upsert(
-            { user_id: data.session.user.id, role: "admin" },
-            { onConflict: "user_id,role" }
-          );
-        }
-        navigate({ to: "/", replace: true });
-      }
+      if (data.session) navigate({ to: "/", replace: true });
     };
     checkSession();
   }, [navigate, search.ref]);
 
-  // Sign In Logic
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -64,28 +46,22 @@ function AuthPage() {
       });
 
       if (authError) {
-        // BUG FIX: Access .message to avoid rendering an object {}
+        // FIX HAPA: Tunachukua .message pekee ili kuzuia {}
         setError(authError.message);
         setLoading(false);
         return;
       }
 
-      // Check admin status on login
       if (data.user?.email === ADMIN_EMAIL) {
-        await supabase.from("user_roles").upsert(
-          { user_id: data.user.id, role: "admin" },
-          { onConflict: "user_id,role" }
-        );
+        await supabase.from("user_roles").upsert({ user_id: data.user.id, role: "admin" }, { onConflict: 'user_id,role' });
       }
-
       navigate({ to: "/", replace: true });
     } catch (err: any) {
-      setError("An unexpected network error occurred.");
+      setError("Network error. Jaribu tena.");
       setLoading(false);
     }
   };
 
-  // Sign Up Logic
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -95,165 +71,126 @@ function AuthPage() {
       const { data, error: authError } = await supabase.auth.signUp({
         email,
         password,
-        options: {
-          data: {
-            username: username || email.split("@")[0],
-          },
-        },
+        options: { data: { username: username || email.split("@")[0] } },
       });
 
       if (authError) {
-        // BUG FIX: Force convert to string to avoid the red {} brackets
+        // FIX HAPA: Tunageuza kuwa String
         setError(String(authError.message));
         setLoading(false);
         return;
       }
 
       if (data.session) {
-        // If sign up is instant (email confirm off)
         if (data.user?.email === ADMIN_EMAIL) {
-          await supabase.from("user_roles").upsert(
-            { user_id: data.user.id, role: "admin" },
-            { onConflict: "user_id,role" }
-          );
+          await supabase.from("user_roles").upsert({ user_id: data.user.id, role: "admin" }, { onConflict: 'user_id,role' });
         }
         navigate({ to: "/", replace: true });
       } else {
-        setSuccess("Karibu! Tafadhali kagua email yako kuthibitisha akaunti.");
+        setSuccess("Imekubali! Kagua email yako kuthibitisha akaunti.");
         setMode("signin");
       }
     } catch (err: any) {
-      setError("Signup failed. Check your connection.");
+      setError("Imeshindwa kusajili.");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleGitHub = async () => {
-    setError(null);
-    try {
-      const { error: authError } = await supabase.auth.signInWithOAuth({
-        provider: "github",
-        options: { redirectTo: `${window.location.origin}/auth` },
-      });
-      if (authError) setError(authError.message);
-    } catch (err: any) {
-      setError("OAuth failed.");
-    }
-  };
-
   return (
-    <div className="mx-auto max-w-lg px-4 py-6">
-      <Link to="/" className="mb-6 inline-flex items-center gap-1 text-sm text-muted-foreground">
-        <i className="fas fa-arrow-left text-xs mr-1"></i> Back to Home
+    <div className="mx-auto max-w-lg px-4 py-10 bg-background min-h-screen text-foreground">
+      <Link to="/" className="mb-6 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-primary transition">
+        <i className="fas fa-arrow-left text-xs mr-2"></i> Rudi Nyumbani
       </Link>
 
-      <div className="mb-6 text-center">
-        <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-full bg-[image:var(--gradient-primary)] shadow-[var(--shadow-neon)]">
-          <i className="fas fa-user-lock text-2xl text-primary-foreground"></i>
+      <div className="mb-8 text-center">
+        <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-[image:var(--gradient-primary)] shadow-[var(--shadow-neon)] animate-pulse">
+          <i className="fas fa-user-shield text-3xl text-primary-foreground"></i>
         </div>
-        <h1 className="bg-[image:var(--gradient-primary)] bg-clip-text text-2xl font-black text-transparent">
+        <h1 className="bg-[image:var(--gradient-primary)] bg-clip-text text-3xl font-black tracking-tighter text-transparent">
           UTAMU PORI
         </h1>
-        <p className="mt-1 text-sm text-muted-foreground font-medium">
-          {mode === "signin" ? "Ingia kwenye akaunti yako" : "Jisajili sasa upate Utamu"}
+        <p className="mt-2 text-sm text-muted-foreground font-semibold uppercase tracking-widest">
+          {mode === "signin" ? "Ingia Sasa" : "Jiunge na Sisi"}
         </p>
       </div>
 
-      <button
-        onClick={handleGitHub}
-        className="mb-4 flex w-full items-center justify-center gap-2 rounded-xl border border-border bg-card py-3 font-semibold text-foreground hover:bg-muted transition-all active:scale-95"
-      >
-        <i className="fab fa-github text-xl"></i> Continue with GitHub
-      </button>
+      <div className="space-y-4">
+        <form onSubmit={mode === "signin" ? handleSignIn : handleSignUp} className="space-y-4">
+          {mode === "signup" && (
+            <div>
+              <label className="mb-1.5 block text-xs font-black uppercase text-muted-foreground ml-1">Username</label>
+              <input
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="mfano: mjanja_01"
+                className="w-full rounded-2xl border border-border bg-card px-4 py-4 text-sm outline-none focus:ring-2 focus:ring-primary/50 transition-all"
+                required
+              />
+            </div>
+          )}
 
-      <div className="mb-4 flex items-center gap-3 text-xs text-muted-foreground uppercase tracking-widest">
-        <span className="h-px flex-1 bg-border" /> AU <span className="h-px flex-1 bg-border" />
-      </div>
-
-      <form onSubmit={mode === "signin" ? handleSignIn : handleSignUp} className="space-y-3">
-        {mode === "signup" && (
           <div>
-            <label className="mb-1 block text-xs text-muted-foreground font-bold">Username</label>
-            <input
-              type="text"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              placeholder="Jina lako la utani"
-              className="w-full rounded-xl border border-border bg-input px-3 py-3 text-sm outline-none focus:border-primary transition-all"
-            />
-          </div>
-        )}
-
-        <div>
-          <label className="mb-1 block text-xs text-muted-foreground font-bold">Barua Pepe (Email)</label>
-          <div className="relative">
-            <i className="fas fa-envelope absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-xs"></i>
+            <label className="mb-1.5 block text-xs font-black uppercase text-muted-foreground ml-1">Email</label>
             <input
               type="email"
-              required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="mfano@gmail.com"
-              className="w-full rounded-xl border border-border bg-input py-3 pl-9 pr-3 text-sm outline-none focus:border-primary transition-all"
+              placeholder="barua@pepe.com"
+              className="w-full rounded-2xl border border-border bg-card px-4 py-4 text-sm outline-none focus:ring-2 focus:ring-primary/50 transition-all"
+              required
             />
           </div>
-        </div>
 
-        <div>
-          <label className="mb-1 block text-xs text-muted-foreground font-bold">Nenosiri (Password)</label>
-          <div className="relative">
-            <i className="fas fa-lock absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-xs"></i>
+          <div>
+            <label className="mb-1.5 block text-xs font-black uppercase text-muted-foreground ml-1">Password</label>
             <input
               type="password"
-              required
-              minLength={6}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
-              className="w-full rounded-xl border border-border bg-input py-3 pl-9 pr-3 text-sm outline-none focus:border-primary transition-all"
+              className="w-full rounded-2xl border border-border bg-card px-4 py-4 text-sm outline-none focus:ring-2 focus:ring-primary/50 transition-all"
+              required
             />
           </div>
+
+          {/* ERROR BOX FIX: String check is here */}
+          {error && (
+            <div className="rounded-2xl bg-destructive/10 border border-destructive/20 p-4 text-xs text-destructive font-bold flex items-center gap-3">
+              <i className="fas fa-exclamation-triangle text-lg"></i>
+              <span>{typeof error === 'object' ? "Hitilafu ya kiufundi, jaribu tena." : error}</span>
+            </div>
+          )}
+
+          {success && (
+            <div className="rounded-2xl bg-green-500/10 border border-green-500/20 p-4 text-xs text-green-500 font-bold flex items-center gap-3">
+              <i className="fas fa-check-circle text-lg"></i>
+              {success}
+            </div>
+          )}
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full rounded-2xl bg-primary py-4 font-black text-white shadow-[var(--shadow-neon)] hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-50 flex justify-center items-center gap-3"
+          >
+            {loading ? <i className="fas fa-spinner fa-spin text-xl"></i> : <i className="fas fa-sign-in-alt"></i>}
+            {mode === "signin" ? "INGIA" : "TENGENEZA AKAUNTI"}
+          </button>
+        </form>
+
+        <div className="pt-4 text-center">
+          <button
+            onClick={() => {
+              setMode(mode === "signin" ? "signup" : "signin");
+              setError(null);
+            }}
+            className="text-sm font-bold text-secondary hover:text-primary transition"
+          >
+            {mode === "signin" ? "Huna akaunti? Jisajili" : "Tayari unayo akaunti? Ingia"}
+          </button>
         </div>
-
-        {/* ERROR BOX FIX: Ensuring only strings are rendered */}
-        {error && (
-          <div className="rounded-xl bg-destructive/10 px-3 py-2 text-xs text-destructive border border-destructive/20 animate-shake">
-            <i className="fas fa-exclamation-triangle mr-1"></i> 
-            {typeof error === 'object' ? "Hitilafu imetokea. Jaribu tena." : error}
-          </div>
-        )}
-
-        {success && (
-          <div className="rounded-xl bg-green-500/10 px-3 py-2 text-xs text-green-500 border border-green-500/20">
-            <i className="fas fa-check-circle mr-1"></i> {success}
-          </div>
-        )}
-
-        <button
-          type="submit"
-          disabled={loading}
-          className="w-full rounded-xl bg-primary py-3 font-bold text-primary-foreground shadow-[var(--shadow-neon)] hover:opacity-90 transition-all active:scale-95 disabled:opacity-60 flex justify-center items-center gap-2"
-        >
-          {loading && <i className="fas fa-spinner fa-spin"></i>}
-          {mode === "signin" ? "Ingia Sasa" : "Tengeneza Akaunti"}
-        </button>
-      </form>
-
-      <div className="mt-8 flex flex-col items-center gap-4 text-sm">
-        <p className="text-muted-foreground">
-          {mode === "signin" ? "Huna akaunti bado?" : "Tayari unayo akaunti?"}
-        </p>
-        <button
-          onClick={() => {
-            setMode(mode === "signin" ? "signup" : "signin");
-            setError(null);
-            setSuccess(null);
-          }}
-          className="font-black text-secondary hover:text-primary transition-colors text-lg"
-        >
-          {mode === "signin" ? "Sign Up" : "Sign In"}
-        </button>
       </div>
     </div>
   );
