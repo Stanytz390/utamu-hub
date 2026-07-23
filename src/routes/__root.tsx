@@ -80,20 +80,24 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "UTAMU PORI — Videos, Dadaz & Groups" },
+      { title: "Home · UTAMU PORI" },
       {
         name: "description",
         content:
-          "UTAMU PORI: tazama videos, gundua dadaz, jiunge groups za VIP. Content ya premium kwa bei rahisi.",
+          "Everything in one feed — videos, dadaz, na groups moto zaidi.",
       },
       { name: "author", content: "UTAMU PORI" },
-      { property: "og:title", content: "UTAMU PORI" },
+      { property: "og:title", content: "Home · UTAMU PORI" },
       {
         property: "og:description",
-        content: "Videos, dadaz na groups zote pamoja. Download, watch, join.",
+        content: "Everything in one feed — videos, dadaz, na groups moto zaidi.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:title", content: "Home · UTAMU PORI" },
+      { name: "twitter:description", content: "Everything in one feed — videos, dadaz, na groups moto zaidi." },
+      { property: "og:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/rw0RLTdjwmbxmNvuXmjAMrQqLx13/social-images/social-1784769722111-IMG-20260720-WA0032.webp" },
+      { name: "twitter:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/rw0RLTdjwmbxmNvuXmjAMrQqLx13/social-images/social-1784769722111-IMG-20260720-WA0032.webp" },
     ],
     links: [
       {
