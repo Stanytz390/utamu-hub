@@ -1,7 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState, useMemo } from "react";
-import { Search } from "lucide-react";
-import { videos } from "@/lib/mock-data";
+import { useState, useMemo, useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import { VideoCard } from "@/components/VideoCard";
 
 export const Route = createFileRoute("/utamu")({
@@ -21,32 +20,84 @@ const filters = ["All", "New", "Old", "Free", "Premium"] as const;
 function Utamu() {
   const [f, setF] = useState<(typeof filters)[number]>("All");
   const [q, setQ] = useState("");
+  const [videos, setVideos] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const list = useMemo(() => {
-    const sorted = [...videos];
-    if (f === "New") sorted.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-    if (f === "Old") sorted.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
-    let out = sorted;
-    if (f === "Free") out = out.filter((v) => v.price_sq === 0);
-    if (f === "Premium") out = out.filter((v) => v.price_sq > 0);
-    const needle = q.trim().toLowerCase();
-    if (needle) {
-      out = out.filter(
-        (v) =>
-          v.title.toLowerCase().includes(needle) ||
-          v.description.toLowerCase().includes(needle) ||
-          v.creator.toLowerCase().includes(needle),
-      );
+  // Fetch videos from Supabase
+  useEffect(() => {
+    const fetchVideos = async () => {
+      setLoading(true);
+      let query = supabase
+        .from("videos")
+        .select(`
+          *,
+          profiles:creator_id ( full_name, avatar_url )
+        `)
+        .eq("status", "available"); // Only show available videos
+
+      // Search filter (client-side after fetch for simplicity, but we can do ilike)
+      // We'll fetch all and filter client-side for search as well
+      // Better to apply server-side ilike to reduce data
+      if (q.trim()) {
+        const search = `%${q.trim()}%`;
+        query = query.or(
+          `title.ilike.${search}, description.ilike.${search}, creator.ilike.${search}`
+        );
+      }
+
+      // Sorting
+      if (f === "New") {
+        query = query.order("created_at", { ascending: false });
+      } else if (f === "Old") {
+        query = query.order("created_at", { ascending: true });
+      } else {
+        query = query.order("created_at", { ascending: false }); // default newest
+      }
+
+      const { data, error } = await query;
+      if (error) {
+        console.error("Error fetching videos:", error);
+        setVideos([]);
+      } else {
+        // Map to match expected VideoCard props (price_sq, etc.)
+        const mapped = (data || []).map((v: any) => ({
+          ...v,
+          creator: v.profiles?.full_name || v.creator || "Unknown",
+          avatar_url: v.profiles?.avatar_url || "",
+        }));
+        setVideos(mapped);
+      }
+      setLoading(false);
+    };
+
+    fetchVideos();
+  }, [f, q]); // refetch when filter or search changes
+
+  // Additional client-side filtering for Free/Premium (since price_sq is 0 or >0)
+  const filteredVideos = useMemo(() => {
+    let out = videos;
+    if (f === "Free") {
+      out = out.filter((v) => v.price_sq === 0);
+    } else if (f === "Premium") {
+      out = out.filter((v) => v.price_sq > 0);
     }
     return out;
-  }, [f, q]);
+  }, [videos, f]);
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center min-h-[60vh]">
+        <i className="fas fa-spinner fa-spin text-4xl text-purple-500"></i>
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto max-w-lg">
       <header className="sticky top-0 z-40 border-b border-border/60 bg-background/80 px-4 py-3 backdrop-blur-xl">
         <h1 className="text-xl font-black">Utamu Videos</h1>
         <div className="relative mt-3">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <i className="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm"></i>
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
@@ -72,12 +123,12 @@ function Utamu() {
       </header>
 
       <section className="grid grid-cols-2 gap-3 p-4">
-        {list.length === 0 && (
+        {filteredVideos.length === 0 && (
           <p className="col-span-2 py-8 text-center text-sm text-muted-foreground">
             Hakuna video iliyopatikana.
           </p>
         )}
-        {list.map((v) => (
+        {filteredVideos.map((v) => (
           <VideoCard key={v.id} video={v} />
         ))}
       </section>
