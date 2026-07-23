@@ -1,115 +1,102 @@
-import { createFileRoute, Link, notFound } from "@tanstack/react-router";
-import { ArrowLeft, Heart, Users, MapPin, MessageCircle, Phone } from "lucide-react";
-import { profiles, type ProfileItem } from "@/lib/mock-data";
+import { createFileRoute } from '@tanstack/react-router';
+import { supabase } from '@/integrations/supabase/client';
+import { useState, useEffect } from 'react';
+import { spendCoins } from '@/lib/payment';
 
-export const Route = createFileRoute("/dadaz/$id")({
-  head: ({ params }) => {
-    const p = profiles.find((x) => x.id === params.id);
-    return {
-      meta: [
-        { title: p ? `${p.username} · Dadaz` : "Profile · Dadaz" },
-        { name: "description", content: p?.bio ?? "Profile page" },
-      ],
-    };
-  },
-  loader: ({ params }): ProfileItem => {
-    const p = profiles.find((x) => x.id === params.id);
-    if (!p) throw notFound();
-    return p;
-  },
-  component: DadazDetail,
-  notFoundComponent: () => (
-    <div className="p-8 text-center text-muted-foreground">Profile haipatikani.</div>
-  ),
-  errorComponent: () => (
-    <div className="p-8 text-center text-muted-foreground">Hitilafu imetokea.</div>
-  ),
+export const Route = createFileRoute('/dadaz/$id')({
+  component: DadazProfile,
 });
 
-function DadazDetail() {
-  const p = Route.useLoaderData();
+function DadazProfile() {
+  const { id } = Route.useParams();
+  const [profile, setProfile] = useState<any>(null);
+  const [settings, setSettings] = useState<any>(null);
+  const [showContact, setShowContact] = useState(false);
+  const [contactBought, setContactBought] = useState(false);
+  const [userId, setUserId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setUserId(user?.id || null);
+
+      const { data: profileData } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', id)
+        .single();
+      setProfile(profileData);
+
+      const { data: settingsData } = await supabase
+        .from('business_settings')
+        .select('*')
+        .eq('user_id', id)
+        .single();
+      setSettings(settingsData);
+
+      // Check if contact already bought
+      if (user) {
+        const { data: tx } = await supabase
+          .from('coin_transactions')
+          .select('id')
+          .eq('user_id', user.id)
+          .eq('ref_id', `contact-${id}`)
+          .eq('kind', 'contact_purchase')
+          .maybeSingle();
+        setContactBought(!!tx);
+        if (tx) setShowContact(true);
+      }
+    };
+    fetchData();
+  }, [id]);
+
+  const handleBuyContact = async () => {
+    if (!userId) return alert('Login first');
+    try {
+      const price = settings?.whatsapp_price || 0;
+      await spendCoins(userId, price, 'contact_purchase', `contact-${id}`, `Purchased contact for ${profile?.full_name}`);
+      setContactBought(true);
+      setShowContact(true);
+    } catch (e: any) {
+      alert(e.message);
+    }
+  };
+
+  if (!profile || !settings) return <div className="p-6">Loading...</div>;
 
   return (
-    <div className="mx-auto max-w-lg">
-      <div className="relative">
-        <img src={p.cover} alt={p.username} className="aspect-[4/5] w-full object-cover" />
-        <div className="absolute inset-0 bg-gradient-to-t from-background via-background/40 to-transparent" />
-        <Link
-          to="/dadaz"
-          className="absolute left-4 top-4 rounded-full bg-black/50 p-2 text-white backdrop-blur"
-        >
-          <ArrowLeft size={20} />
-        </Link>
-      </div>
+    <div className="max-w-2xl mx-auto p-6">
+      <img src={profile.avatar_url || 'https://via.placeholder.com/150'} alt="Profile" className="w-32 h-32 rounded-full mx-auto" />
+      <h1 className="text-2xl font-bold text-center mt-4">{profile.full_name}</h1>
+      <p className="text-center text-gray-500">{profile.bio}</p>
 
-      <div className="relative -mt-24 px-4 pb-6">
-        <h1 className="text-3xl font-black">{p.username}</h1>
-        <p className="mt-1 flex items-center gap-1 text-sm text-muted-foreground">
-          <MapPin size={14} /> {p.location}
-        </p>
-
-        <div className="mt-4 flex items-center gap-6">
-          <div>
-            <p className="text-xl font-black">{p.followers.toLocaleString()}</p>
-            <p className="flex items-center gap-1 text-xs text-muted-foreground">
-              <Users size={12} /> Followers
-            </p>
-          </div>
-          <div>
-            <p className="text-xl font-black">{p.likes.toLocaleString()}</p>
-            <p className="flex items-center gap-1 text-xs text-muted-foreground">
-              <Heart size={12} /> Likes
-            </p>
-          </div>
-          <span
-            className={`ml-auto rounded-full px-3 py-1 text-[10px] font-bold uppercase ${
-              p.status === "service"
-                ? "bg-primary/20 text-primary"
-                : p.status === "work"
-                ? "bg-secondary/20 text-secondary"
-                : "bg-muted text-muted-foreground"
-            }`}
+      <div className="mt-6 space-y-4">
+        {!showContact ? (
+          <button
+            onClick={handleBuyContact}
+            className="w-full bg-purple-500 text-white py-3 rounded-xl font-semibold"
           >
-            {p.status}
-          </span>
-        </div>
-
-        <p className="mt-4 text-sm leading-relaxed text-foreground/90">{p.bio}</p>
-        {p.price && (
-          <p className="mt-3 rounded-xl border border-primary/40 bg-primary/10 px-3 py-2 text-sm font-semibold text-primary">
-            {p.price}
-          </p>
+            View Contact ({settings.whatsapp_price || 0} SQ)
+          </button>
+        ) : (
+          <div className="flex gap-3 flex-wrap">
+            {settings.whatsapp && (
+              <a href={`https://wa.me/${settings.whatsapp}`} className="flex-1 bg-green-500 text-white py-2 rounded-xl text-center">
+                <i className="fab fa-whatsapp mr-2" /> WhatsApp
+              </a>
+            )}
+            {settings.phone && (
+              <>
+                <a href={`tel:${settings.phone}`} className="flex-1 bg-blue-500 text-white py-2 rounded-xl text-center">
+                  <i className="fas fa-phone mr-2" /> Call
+                </a>
+                <a href={`sms:${settings.phone}`} className="flex-1 bg-gray-500 text-white py-2 rounded-xl text-center">
+                  <i className="fas fa-sms mr-2" /> SMS
+                </a>
+              </>
+            )}
+          </div>
         )}
-
-        <div className="mt-4 grid grid-cols-2 gap-2">
-          <a
-            href={`https://wa.me/${p.whatsapp.replace(/[^0-9]/g, "")}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center justify-center gap-2 rounded-xl bg-secondary py-3 text-sm font-bold text-secondary-foreground"
-          >
-            <MessageCircle size={16} /> WhatsApp
-          </a>
-          <a
-            href={`tel:${p.phone}`}
-            className="flex items-center justify-center gap-2 rounded-xl bg-primary py-3 text-sm font-bold text-primary-foreground shadow-[var(--shadow-neon)]"
-          >
-            <Phone size={16} /> Call
-          </a>
-        </div>
-
-        <h2 className="mb-3 mt-8 text-lg font-bold">Photos</h2>
-        <div className="grid grid-cols-2 gap-2">
-          {p.photos.map((src: string, i: number) => (
-            <img
-              key={i}
-              src={src}
-              alt={`${p.username} ${i + 1}`}
-              className="aspect-square w-full rounded-xl object-cover"
-              loading="lazy"
-            />
-          ))}
-        </div>
       </div>
     </div>
   );
