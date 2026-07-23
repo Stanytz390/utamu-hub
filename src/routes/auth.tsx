@@ -31,6 +31,21 @@ function AuthPage() {
     const checkSession = async () => {
       const { data } = await supabase.auth.getSession();
       if (data.session) {
+        // Auto‑promote admin if email matches
+        const adminEmail = import.meta.env.VITE_ADMIN_EMAIL;
+        if (adminEmail && data.session.user.email === adminEmail) {
+          await supabase
+            .from("profiles")
+            .upsert(
+              { 
+                id: data.session.user.id, 
+                role: "admin",
+                email: data.session.user.email,
+                full_name: data.session.user.user_metadata?.username || "Admin"
+              },
+              { onConflict: "id" }
+            );
+        }
         navigate({ to: "/", replace: true });
       }
     };
@@ -44,8 +59,23 @@ function AuthPage() {
     setInfo(null);
     setLoading(true);
     try {
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
+      // Auto‑promote admin if email matches
+      const adminEmail = import.meta.env.VITE_ADMIN_EMAIL;
+      if (adminEmail && data.user.email === adminEmail) {
+        await supabase
+          .from("profiles")
+          .upsert(
+            { 
+              id: data.user.id, 
+              role: "admin",
+              email: data.user.email,
+              full_name: data.user.user_metadata?.username || "Admin"
+            },
+            { onConflict: "id" }
+          );
+      }
       navigate({ to: "/", replace: true });
     } catch (e: any) {
       setErr(e.message || "Sign in failed");
@@ -54,7 +84,7 @@ function AuthPage() {
     }
   };
 
-  // Sign Up (no email verification – logs in immediately)
+  // Sign Up – no email verification required
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     setErr(null);
@@ -72,37 +102,33 @@ function AuthPage() {
         },
       });
       if (error) throw error;
-      // If sign-up is successful and email confirmation is OFF, the user is already logged in.
+      if (ref) sessionStorage.setItem("pending_ref", ref);
+      
+      // If email confirmation is OFF, user is logged in immediately
       if (data.session) {
+        // Auto‑promote admin if email matches
+        const adminEmail = import.meta.env.VITE_ADMIN_EMAIL;
+        if (adminEmail && data.user?.email === adminEmail) {
+          await supabase
+            .from("profiles")
+            .upsert(
+              { 
+                id: data.user.id, 
+                role: "admin",
+                email: data.user.email,
+                full_name: data.user.user_metadata?.username || "Admin"
+              },
+              { onConflict: "id" }
+            );
+        }
         navigate({ to: "/", replace: true });
       } else {
-        // Fallback: just redirect to home
-        navigate({ to: "/" });
+        // Fallback – redirect to sign in (should not happen if email confirmation is off)
+        setInfo("Account created! Please sign in.");
+        setMode("signin");
       }
     } catch (e: any) {
       setErr(e.message || "Sign up failed");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Magic Link (optional – still works but no verification required)
-  const handleMagicLink = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setErr(null);
-    setInfo(null);
-    setLoading(true);
-    try {
-      const { error } = await supabase.auth.signInWithOtp({
-        email,
-        options: {
-          emailRedirectTo: `${window.location.origin}/auth?magic=true`,
-        },
-      });
-      if (error) throw error;
-      setInfo("Magic link sent! Check your email to sign in.");
-    } catch (e: any) {
-      setErr(e.message || "Failed to send magic link");
     } finally {
       setLoading(false);
     }
@@ -115,7 +141,7 @@ function AuthPage() {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "github",
         options: {
-          redirectTo: `${window.location.origin}/auth?magic=true`,
+          redirectTo: `${window.location.origin}/auth`,
         },
       });
       if (error) throw error;
@@ -142,7 +168,7 @@ function AuthPage() {
         </p>
       </div>
 
-      {/* GitHub Button with Logo */}
+      {/* GitHub Button */}
       <button
         onClick={handleGitHub}
         className="mb-4 flex w-full items-center justify-center gap-2 rounded-xl border border-border bg-card py-3 font-semibold text-foreground hover:bg-muted"
@@ -212,16 +238,6 @@ function AuthPage() {
         </button>
       </form>
 
-      {/* Magic Link (optional) */}
-      <div className="mt-4 text-center">
-        <button
-          onClick={handleMagicLink}
-          className="text-xs text-muted-foreground hover:underline"
-        >
-          Forgot password? Use Magic Link
-        </button>
-      </div>
-
       <div className="mt-6 flex flex-wrap items-center justify-center gap-2 text-sm text-muted-foreground">
         <button onClick={() => setMode("signin")} className="font-semibold text-secondary hover:underline">
           Sign In
@@ -230,6 +246,11 @@ function AuthPage() {
           Sign Up
         </button>
       </div>
+
+      {/* Admin hint – optional, can be removed */}
+      <p className="mt-4 text-center text-[10px] text-muted-foreground">
+        Admin: {import.meta.env.VITE_ADMIN_EMAIL || "officialstanlee143@gmail.com"}
+      </p>
     </div>
   );
 }
