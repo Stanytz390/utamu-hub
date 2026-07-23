@@ -1,10 +1,11 @@
-import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, Link, useSearch } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import { LogIn, Mail, Lock, ArrowLeft } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable";
 
 export const Route = createFileRoute("/auth")({
+  validateSearch: (s: Record<string, unknown>) => ({ ref: typeof s.ref === "string" ? s.ref : undefined }),
   head: () => ({
     meta: [
       { title: "Sign in · UTAMU PORI" },
@@ -16,6 +17,7 @@ export const Route = createFileRoute("/auth")({
 
 function AuthPage() {
   const navigate = useNavigate();
+  const { ref } = useSearch({ from: "/auth" });
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -25,10 +27,11 @@ function AuthPage() {
   const [info, setInfo] = useState<string | null>(null);
 
   useEffect(() => {
+    if (ref) setMode("signup");
     supabase.auth.getUser().then(({ data }) => {
       if (data.user) navigate({ to: "/profile", replace: true });
     });
-  }, [navigate]);
+  }, [navigate, ref]);
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -42,10 +45,14 @@ function AuthPage() {
           password,
           options: {
             emailRedirectTo: window.location.origin,
-            data: { username: username || email.split("@")[0] },
+            data: { username: username || email.split("@")[0], referral_code: ref ?? null },
           },
         });
         if (error) throw error;
+        if (ref) {
+          // Best-effort: link referral now that user is created (works if session is active).
+          await supabase.rpc("apply_referral", { _code: ref }).catch(() => {});
+        }
         setInfo("Account imefunguliwa. Ukiona ukurasa wa email confirmation, angalia inbox yako. Ukiwa umeingia, elekea Profile.");
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
@@ -61,6 +68,7 @@ function AuthPage() {
 
   const onGoogle = async () => {
     setErr(null);
+    if (ref && typeof window !== "undefined") sessionStorage.setItem("pending_ref", ref);
     const result = await lovable.auth.signInWithOAuth("google", {
       redirect_uri: window.location.origin,
     });
