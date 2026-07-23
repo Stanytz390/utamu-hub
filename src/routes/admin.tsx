@@ -207,24 +207,32 @@ function DashboardContent({ stats }: { stats: any }) {
 }
 
 // ============================================================
-// 2. MANAGE VIDEOS
+// 2. MANAGE VIDEOS – FIXED (no category_slug)
 // ============================================================
 function VideosContent() {
   const [vids, setVids] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
-  const [form, setForm] = useState({ title: "", video_url: "", thumbnail_url: "", price_sq: 0 });
+  const [form, setForm] = useState({ title: "", video_url: "", thumbnail_url: "", price_sq: 0, category_id: "" });
+  const [categories, setCategories] = useState<any[]>([]);
 
   const fetchVids = async () => {
     try {
       setLoading(true);
-      const { data } = await supabase.from("videos").select("*").order("created_at", { ascending: false });
+      const { data } = await supabase.from("videos").select("*, categories(id, name)").order("created_at", { ascending: false });
       setVids(data || []);
     } catch (e) { console.error(e); }
     finally { setLoading(false); }
   };
 
-  useEffect(() => { fetchVids(); }, []);
+  const fetchCategories = async () => {
+    try {
+      const { data } = await supabase.from("categories").select("id, name").order("sort_order");
+      setCategories(data || []);
+    } catch (e) { console.error(e); }
+  };
+
+  useEffect(() => { fetchVids(); fetchCategories(); }, []);
 
   const save = async (e: any) => {
     e.preventDefault();
@@ -235,13 +243,13 @@ function VideosContent() {
         thumbnail_url: form.thumbnail_url || null,
         price_tsh: form.price_sq * 100,
         is_published: true,
-        category_slug: "utamu",
+        category_id: form.category_id || null,
       };
       const { error } = await supabase.from("videos").insert([payload]);
       if (error) throw error;
       alert("Video Added!");
       setShowAdd(false);
-      setForm({ title: "", video_url: "", thumbnail_url: "", price_sq: 0 });
+      setForm({ title: "", video_url: "", thumbnail_url: "", price_sq: 0, category_id: "" });
       fetchVids();
     } catch (err: any) { alert("Error: " + err.message); }
   };
@@ -269,6 +277,10 @@ function VideosContent() {
           <input placeholder="Video MP4 Link" required className="w-full bg-black/50 border border-white/10 p-4 rounded-2xl text-sm" onChange={e => setForm({...form, video_url: e.target.value})} />
           <input placeholder="Thumbnail Image Link" className="w-full bg-black/50 border border-white/10 p-4 rounded-2xl text-sm" onChange={e => setForm({...form, thumbnail_url: e.target.value})} />
           <input type="number" placeholder="Price SQ (0 for Free)" className="w-full bg-black/50 border border-white/10 p-4 rounded-2xl text-sm" onChange={e => setForm({...form, price_sq: Number(e.target.value)})} />
+          <select className="w-full bg-black/50 border border-white/10 p-4 rounded-2xl text-sm" value={form.category_id} onChange={e => setForm({...form, category_id: e.target.value})}>
+            <option value="">Select Category</option>
+            {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
           <button type="submit" className="w-full bg-white text-black py-4 rounded-2xl font-black uppercase tracking-tighter">Publish Now</button>
         </form>
       )}
@@ -284,6 +296,7 @@ function VideosContent() {
               <div className="min-w-0 flex-1">
                 <p className="font-bold text-sm truncate">{v.title}</p>
                 <p className="text-[10px] text-muted-foreground uppercase">{v.views_count || 0} Views</p>
+                <p className="text-[10px] text-primary">{v.categories?.name || "No category"}</p>
               </div>
               <button onClick={() => deleteVideo(v.id)} className="text-red-500 p-2 hover:bg-red-500/10 rounded-xl transition-colors">
                 <i className="fas fa-trash"></i>
@@ -366,7 +379,7 @@ function DadazContent() {
 }
 
 // ============================================================
-// 4. MANAGE GROUPS (with Price)
+// 4. MANAGE GROUPS – FIXED (no is_published error)
 // ============================================================
 function GroupsContent() {
   const [groups, setGroups] = useState<any[]>([]);
@@ -447,7 +460,7 @@ function GroupsContent() {
 }
 
 // ============================================================
-// 5. REDEEM CODES (with is_active removed if error)
+// 5. REDEEM CODES – FIXED (no is_active error)
 // ============================================================
 function RedeemContent() {
   const [codes, setCodes] = useState<any[]>([]);
@@ -473,7 +486,7 @@ function RedeemContent() {
         code, 
         coins_sq: amt, 
         max_uses: uses,
-        // is_active: true // comment if column missing, but after SQL it will exist
+        is_active: true
       });
       if (error) throw error;
       alert("Code Created!");
@@ -533,7 +546,7 @@ function RedeemContent() {
 }
 
 // ============================================================
-// 6. APP SETTINGS
+// 6. APP SETTINGS – FIXED (no RLS recursion)
 // ============================================================
 function SettingsContent() {
   const [settings, setSettings] = useState<any>({});
