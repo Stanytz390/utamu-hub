@@ -9,17 +9,16 @@ import {
 import { toast, Toaster } from "sonner";
 
 // ============================================================
-// ADMIN SECURITY CHECK & ROUTE DEFINITION
+// SECURITY CHECK (Stanlee Access)
 // ============================================================
 export const Route = createFileRoute("/admin")({
   beforeLoad: async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw redirect({ to: "/auth" });
 
-    // 1. Hard-coded bypass kwa ajili yako Stanlee
+    // Hii ndio kinga yako - Email yako inapita moja kwa moja
     if (user.email?.toLowerCase() === 'officialstanlee143@gmail.com') return { user };
 
-    // 2. Check role kwenye database
     const { data: roleData } = await supabase
       .from("user_roles")
       .select("role")
@@ -38,17 +37,17 @@ function AdminDashboard() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   const menu = [
-    { id: "dashboard", label: "Overview", icon: LayoutDashboard },
-    { id: "users", label: "Users", icon: Users },
-    { id: "videos", label: "Videos", icon: Video },
-    { id: "dadaz", label: "Dadaz", icon: UserCheck },
+    { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
+    { id: "users", label: "Manage Users", icon: Users },
+    { id: "videos", label: "Utamu Videos", icon: Video },
+    { id: "dadaz", label: "Dadaz (Profiles)", icon: UserCheck },
     { id: "groups", label: "Groups", icon: Globe },
-    { id: "redeem", label: "Codes", icon: Gift },
+    { id: "redeem", label: "Redeem Codes", icon: Gift },
     { id: "settings", label: "Settings", icon: Settings },
   ];
 
   return (
-    <div className="flex min-h-screen bg-[#050505] text-white selection:bg-primary/30">
+    <div className="flex min-h-screen bg-[#050505] text-white selection:bg-primary/30 font-sans">
       <Toaster position="top-center" richColors />
       
       {/* MOBILE NAVBAR */}
@@ -56,15 +55,15 @@ function AdminDashboard() {
         <button onClick={() => setIsSidebarOpen(true)} className="p-2 bg-white/5 rounded-xl text-primary border border-white/5">
           <Menu size={22} />
         </button>
-        <span className="font-black italic tracking-tighter text-lg bg-gradient-to-r from-pink-500 to-violet-500 bg-clip-text text-transparent uppercase">Admin Hub</span>
+        <span className="font-black italic tracking-tighter text-lg bg-gradient-to-r from-pink-500 to-violet-500 bg-clip-text text-transparent uppercase">ADMIN HUB</span>
         <Link to="/" className="p-2 bg-white/5 rounded-xl text-muted-foreground"><X size={18}/></Link>
       </div>
 
-      {/* SIDEBAR (MOBILE & DESKTOP) */}
+      {/* SIDEBAR */}
       <aside className={`fixed md:relative z-[70] w-64 h-full bg-[#111] border-r border-white/5 transition-transform duration-300 ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"} md:translate-x-0 shadow-2xl`}>
         <div className="p-8 border-b border-white/5 hidden md:block">
-          <h1 className="text-2xl font-black italic tracking-tighter bg-gradient-to-r from-pink-500 to-violet-500 bg-clip-text text-transparent">UTAMU PORI</h1>
-          <p className="text-[9px] font-black text-muted-foreground uppercase tracking-[0.3em] mt-1">Super Admin</p>
+          <h1 className="text-2xl font-black italic tracking-tighter bg-gradient-to-r from-pink-500 to-violet-500 bg-clip-text text-transparent">UTAMU ADMIN</h1>
+          <p className="text-[9px] font-black text-muted-foreground uppercase tracking-[0.3em] mt-1">Super Administrator</p>
         </div>
         <nav className="p-4 space-y-1.5 mt-20 md:mt-0">
           {menu.map(item => (
@@ -78,11 +77,11 @@ function AdminDashboard() {
           ))}
         </nav>
         <div className="absolute bottom-6 left-6 right-6">
-          <button onClick={() => supabase.auth.signOut().then(() => navigate({to: '/auth'}))} className="w-full py-3 rounded-2xl bg-red-500/10 text-red-500 font-black text-xs uppercase border border-red-500/20 hover:bg-red-500 hover:text-white transition-all">Logout</button>
+          <button onClick={() => supabase.auth.signOut().then(() => navigate({to: '/auth'}))} className="w-full py-3 rounded-2xl bg-red-500/10 text-red-500 font-black text-xs uppercase border border-red-500/20 hover:bg-red-500 hover:text-white transition-all">Log Out</button>
         </div>
       </aside>
 
-      {/* OVERLAY */}
+      {/* MOBILE OVERLAY */}
       {isSidebarOpen && <div className="fixed inset-0 bg-black/80 z-[60] md:hidden" onClick={() => setIsSidebarOpen(false)} />}
 
       {/* MAIN CONTENT */}
@@ -102,45 +101,53 @@ function AdminDashboard() {
 }
 
 // ============================================================
-// TAB COMPONENTS
+// 1. OVERVIEW
 // ============================================================
-
 function OverviewTab() {
-  const [stats, setStats] = useState({ users: 0, vids: 0, active_dadaz: 0 });
+  const [stats, setStats] = useState({ users: 0, vids: 0, dadaz: 0 });
   useEffect(() => {
     const fetch = async () => {
       const { count: u } = await supabase.from("profiles").select("*", { count: "exact", head: true });
       const { count: v } = await supabase.from("videos").select("*", { count: "exact", head: true });
-      const { count: d } = await supabase.from("dadaz_profiles").select("*", { count: "exact", head: true, is_published: true });
-      setStats({ users: u||0, vids: v||0, active_dadaz: d||0 });
+      const { count: d } = await supabase.from("dadaz_profiles").select("*", { count: "exact", head: true });
+      setStats({ users: u||0, vids: v||0, dadaz: d||0 });
     };
     fetch();
   }, []);
 
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 animate-in slide-in-from-bottom-2 duration-500">
-      <div className="bg-[#111] p-6 rounded-[2rem] border border-white/5">
-        <Users className="text-blue-500 mb-3" />
-        <p className="text-3xl font-black">{stats.users}</p>
-        <p className="text-[10px] uppercase font-bold text-muted-foreground">Total Users</p>
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 animate-in slide-in-from-bottom-2 duration-500">
+      <div className="bg-[#111] p-6 rounded-3xl border border-white/5 shadow-xl">
+        <Users className="text-blue-400 mb-2" />
+        <p className="text-2xl font-black">{stats.users}</p>
+        <p className="text-[10px] text-muted-foreground uppercase font-bold">Total Users</p>
       </div>
-      <div className="bg-[#111] p-6 rounded-[2rem] border border-white/5">
-        <Video className="text-primary mb-3" />
-        <p className="text-3xl font-black">{stats.vids}</p>
-        <p className="text-[10px] uppercase font-bold text-muted-foreground">Live Videos</p>
+      <div className="bg-[#111] p-6 rounded-3xl border border-white/5 shadow-xl">
+        <Video className="text-primary mb-2" />
+        <p className="text-2xl font-black">{stats.vids}</p>
+        <p className="text-[10px] text-muted-foreground uppercase font-bold">Videos</p>
       </div>
-      <div className="bg-[#111] p-6 rounded-[2rem] border border-white/5">
-        <UserCheck className="text-secondary mb-3" />
-        <p className="text-3xl font-black">{stats.active_dadaz}</p>
-        <p className="text-[10px] uppercase font-bold text-muted-foreground">Verified Dadaz</p>
+      <div className="bg-[#111] p-6 rounded-3xl border border-white/5 shadow-xl">
+        <UserCheck className="text-secondary mb-2" />
+        <p className="text-2xl font-black">{stats.dadaz}</p>
+        <p className="text-[10px] text-muted-foreground uppercase font-bold">Dadaz</p>
+      </div>
+      <div className="bg-[#111] p-6 rounded-3xl border border-white/5 shadow-xl">
+        <Coins className="text-yellow-500 mb-2" />
+        <p className="text-2xl font-black">0</p>
+        <p className="text-[10px] text-muted-foreground uppercase font-bold">Revenue</p>
       </div>
     </div>
   );
 }
 
+// ============================================================
+// 2. MANAGE USERS (MAKE DADAZ)
+// ============================================================
 function UsersTab() {
   const [users, setUsers] = useState<any[]>([]);
   const [q, setQ] = useState("");
+
   const fetch = async () => {
     const { data } = await supabase.from("profiles").select("id, username, email, user_roles(role)").order("created_at", { ascending: false });
     setUsers(data || []);
@@ -148,28 +155,40 @@ function UsersTab() {
   useEffect(() => { fetch(); }, []);
 
   const promote = async (uid: string, name: string) => {
+    // 1. Promote to Role Business
     await supabase.from("user_roles").upsert({ user_id: uid, role: "business" }, { onConflict: 'user_id' });
-    await supabase.from("dadaz_profiles").upsert({ id: uid, owner_id: uid, username: name || "dada", is_published: true });
-    toast.success("Account promoted to DADAZ!"); fetch();
+    // 2. Create profile in dadaz_profiles
+    await supabase.from("dadaz_profiles").upsert({ 
+        id: uid, 
+        owner_id: uid, 
+        username: name || "new_dada", 
+        status: "work", 
+        is_published: true 
+    });
+    toast.success("Account converted to DADAZ!"); fetch();
   };
 
-  const filtered = users.filter(u => u.email?.toLowerCase().includes(q.toLowerCase()) || u.username?.toLowerCase().includes(q.toLowerCase()));
+  const filtered = users.filter(u => u.email?.toLowerCase().includes(q.toLowerCase()));
 
   return (
     <div className="space-y-6">
-      <input placeholder="Search users..." className="w-full bg-[#111] border border-white/10 p-4 rounded-2xl outline-none focus:border-primary" onChange={e => setQ(e.target.value)} />
+      <input 
+        placeholder="Search users by email..." 
+        className="w-full bg-[#111] border border-white/10 p-4 rounded-2xl outline-none focus:border-primary transition-all shadow-lg"
+        onChange={e => setQ(e.target.value)} 
+      />
       <div className="space-y-3">
         {filtered.map(u => {
           const role = u.user_roles?.[0]?.role || 'user';
           return (
-            <div key={u.id} className="bg-[#111] p-5 rounded-3xl border border-white/5 flex justify-between items-center gap-4">
-               <div>
-                  <p className="font-bold">@{u.username || "guest"}</p>
-                  <p className="text-[10px] text-muted-foreground">{u.email}</p>
-                  <span className={`text-[9px] font-black uppercase ${role === 'admin' ? 'text-red-500' : 'text-primary'}`}>{role}</span>
+            <div key={u.id} className="bg-[#111] p-5 rounded-3xl border border-white/5 flex flex-col md:flex-row justify-between items-center gap-4">
+               <div className="w-full">
+                  <p className="font-black text-lg">@{u.username || "guest"}</p>
+                  <p className="text-[11px] text-muted-foreground">{u.email}</p>
+                  <span className={`text-[9px] font-black uppercase mt-1 inline-block px-2 py-0.5 rounded-full ${role === 'admin' ? 'bg-red-500/20 text-red-500' : 'bg-primary/20 text-primary'}`}>{role}</span>
                </div>
                {role === 'user' && (
-                 <button onClick={() => promote(u.id, u.username)} className="bg-primary px-4 py-2 rounded-xl text-[10px] font-black uppercase">Promote</button>
+                 <button onClick={() => promote(u.id, u.username)} className="w-full md:w-auto bg-primary px-6 py-2.5 rounded-xl font-black text-[10px] uppercase shadow-neon active:scale-95 transition-all">Promote to Dadaz</button>
                )}
             </div>
           );
@@ -179,6 +198,9 @@ function UsersTab() {
   );
 }
 
+// ============================================================
+// 3. VIDEOS (UPLOADING)
+// ============================================================
 function VideosTab() {
   const [vids, setVids] = useState<any[]>([]);
   const [showAdd, setShowAdd] = useState(false);
@@ -192,30 +214,41 @@ function VideosTab() {
 
   const save = async (e: any) => {
     e.preventDefault();
-    const { error } = await supabase.from("videos").insert([{ ...form, status: 'available', price_tsh: form.price_sq * 100, is_published: true }]);
+    // Nimeongeza price_tsh hapa kwa ajili ya database error
+    const { error } = await supabase.from("videos").insert([{ 
+        ...form, 
+        status: 'available', 
+        price_tsh: form.price_sq * 100, 
+        is_published: true 
+    }]);
     if (error) toast.error(error.message);
-    else { toast.success("Live!"); setShowAdd(false); fetch(); }
+    else { toast.success("Video is LIVE!"); setShowAdd(false); fetch(); }
   };
 
   return (
     <div className="space-y-6">
-      <button onClick={() => setShowAdd(!showAdd)} className="w-full bg-primary py-4 rounded-2xl font-black shadow-neon uppercase tracking-tighter">
-        {showAdd ? "Close" : "+ Upload New Video"}
+      <button onClick={() => setShowAdd(!showAdd)} className="bg-primary py-4 px-8 rounded-2xl font-black shadow-neon flex items-center gap-2">
+        {showAdd ? <X size={20}/> : <Plus size={20}/>} {showAdd ? "CANCEL" : "UPLOAD VIDEO"}
       </button>
+
       {showAdd && (
-        <form onSubmit={save} className="bg-[#111] p-6 rounded-3xl border border-primary/20 space-y-4">
+        <form onSubmit={save} className="bg-[#111] p-6 rounded-3xl border border-primary/20 space-y-4 max-w-xl animate-in slide-in-from-top">
           <input placeholder="Title" required className="w-full bg-black border border-white/10 p-4 rounded-xl outline-none" onChange={e => setForm({...form, title: e.target.value})} />
           <input placeholder="Video Link (.mp4)" required className="w-full bg-black border border-white/10 p-4 rounded-xl outline-none" onChange={e => setForm({...form, video_url: e.target.value})} />
           <input placeholder="Thumbnail Link" className="w-full bg-black border border-white/10 p-4 rounded-xl outline-none" onChange={e => setForm({...form, thumbnail_url: e.target.value})} />
           <input type="number" placeholder="Price SQ" className="w-full bg-black border border-white/10 p-4 rounded-xl outline-none" onChange={e => setForm({...form, price_sq: Number(e.target.value)})} />
-          <button className="w-full bg-white text-black py-4 rounded-xl font-black">PUBLISH NOW</button>
+          <button className="w-full bg-white text-black py-4 rounded-xl font-black uppercase">Publish Now</button>
         </form>
       )}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {vids.map(v => (
-          <div key={v.id} className="bg-[#111] p-4 rounded-3xl border border-white/5 flex justify-between items-center">
-            <span className="font-bold truncate pr-4">{v.title}</span>
-            <button onClick={async () => { await supabase.from("videos").delete().eq("id", v.id); fetch(); }} className="text-red-500"><Trash2 size={18}/></button>
+          <div key={v.id} className="bg-[#111] rounded-2xl border border-white/5 overflow-hidden">
+            <img src={v.thumbnail_url || "https://via.placeholder.com/300"} className="aspect-video w-full object-cover" />
+            <div className="p-4 flex justify-between items-center">
+              <span className="font-bold truncate text-sm">{v.title}</span>
+              <button onClick={async () => { await supabase.from("videos").delete().eq("id", v.id); fetch(); }}><Trash2 className="text-red-500" size={18}/></button>
+            </div>
           </div>
         ))}
       </div>
@@ -223,6 +256,9 @@ function VideosTab() {
   );
 }
 
+// ============================================================
+// 4. DADAZ MANAGER (VERIFICATION)
+// ============================================================
 function DadazTab() {
   const [dadaz, setDadaz] = useState<any[]>([]);
   const fetch = async () => {
@@ -231,21 +267,21 @@ function DadazTab() {
   };
   useEffect(() => { fetch(); }, []);
 
-  const verify = async (id: string, current: boolean) => {
-    await supabase.from("dadaz_profiles").update({ is_admin_approved: !current }).eq("id", id);
-    toast.success("Updated!"); fetch();
+  const verify = async (id: string, status: boolean) => {
+    await supabase.from("dadaz_profiles").update({ is_admin_approved: !status }).eq("id", id);
+    toast.success("Updated Verification!"); fetch();
   };
 
   return (
     <div className="space-y-3">
       {dadaz.map(d => (
-        <div key={d.id} className="bg-[#111] p-4 rounded-3xl border border-white/5 flex justify-between items-center">
+        <div key={d.id} className="bg-[#111] p-4 rounded-2xl border border-white/5 flex justify-between items-center">
           <div className="flex items-center gap-3">
             <img src={d.avatar_url || "https://via.placeholder.com/50"} className="w-10 h-10 rounded-full border border-primary object-cover" />
             <p className="font-black text-sm">@{d.username}</p>
           </div>
           <button onClick={() => verify(d.id, d.is_admin_approved)} className={`p-3 rounded-xl transition-all ${d.is_admin_approved ? "bg-green-500 text-white shadow-lg" : "bg-white/5 text-muted-foreground"}`}>
-             <CheckCircle size={20} />
+            <CheckCircle size={20}/>
           </button>
         </div>
       ))}
@@ -253,100 +289,66 @@ function DadazTab() {
   );
 }
 
-function GroupsTab() {
-  const [groups, setGroups] = useState<any[]>([]);
-  const [form, setForm] = useState({ name: "", link: "" });
-  const fetch = async () => {
-    const { data } = await supabase.from("groups").select("*");
-    setGroups(data || []);
-  };
-  useEffect(() => { fetch(); }, []);
-
-  const save = async (e: any) => {
-    e.preventDefault();
-    await supabase.from("groups").insert([{ ...form, is_published: true }]);
-    toast.success("Group Added!"); fetch();
-  };
-
-  return (
-    <div className="space-y-6">
-       <form onSubmit={save} className="bg-[#111] p-6 rounded-[2rem] border border-white/5 space-y-4 max-w-xl">
-          <input placeholder="Group Name" required className="w-full bg-black border border-white/10 p-4 rounded-2xl outline-none" onChange={e => setForm({...form, name: e.target.value})} />
-          <input placeholder="Invite Link" required className="w-full bg-black border border-white/10 p-4 rounded-2xl outline-none" onChange={e => setForm({...form, link: e.target.value})} />
-          <button className="w-full bg-secondary text-black py-4 rounded-2xl font-black uppercase">Add Group</button>
-       </form>
-       {groups.map(g => (
-         <div key={g.id} className="bg-[#111] p-4 pl-6 rounded-3xl border border-white/5 flex items-center justify-between">
-            <span className="font-bold">{g.name}</span>
-            <button onClick={async () => { await supabase.from("groups").delete().eq("id", g.id); fetch(); }} className="text-red-500"><Trash2 size={18}/></button>
-         </div>
-       ))}
-    </div>
-  );
-}
-
+// ============================================================
+// 5. REDEEM & SETTINGS
+// ============================================================
 function RedeemTab() {
   const [codes, setCodes] = useState<any[]>([]);
-  const [amt, setAmt] = useState(10);
   const fetch = async () => {
-    const { data } = await supabase.from("redeem_links").select("*").order("created_at", { ascending: false });
+    const { data } = await supabase.from("redeem_links").select("*");
     setCodes(data || []);
   };
   useEffect(() => { fetch(); }, []);
 
   const generate = async () => {
-    const code = "UP-" + Math.random().toString(36).substring(2, 8).toUpperCase();
-    await supabase.from("redeem_links").insert({ code, coins_sq: amt, max_uses: 1, is_active: true });
+    const code = "UP-" + Math.random().toString(36).substring(2, 7).toUpperCase();
+    await supabase.from("redeem_links").insert({ code, coins_sq: 10, max_uses: 1, is_active: true });
     toast.success("Voucher Created!"); fetch();
   };
 
   return (
-    <div className="space-y-6">
-       <div className="bg-primary/10 p-8 rounded-[2rem] border border-primary/20 text-center max-w-xl mx-auto">
-          <h3 className="font-black text-xl mb-4 text-primary">Generate Coin Voucher</h3>
-          <input type="number" value={amt} onChange={e => setAmt(Number(e.target.value))} className="bg-black border border-white/10 p-5 rounded-3xl text-center text-3xl font-black w-full mb-6" />
-          <button onClick={generate} className="w-full bg-primary py-4 rounded-2xl font-black shadow-neon">GENERATE UNIQUE CODE</button>
-       </div>
-       <div className="bg-[#111] rounded-[2rem] border border-white/5 overflow-hidden">
-          <table className="w-full text-xs text-left">
-             <thead className="bg-white/5 font-black uppercase text-muted-foreground"><tr className="p-5"><th className="p-5">Code</th><th className="p-5 text-center">SQ</th><th className="p-5"></th></tr></thead>
-             <tbody className="divide-y divide-white/5">
-                {codes.map(c => (
-                  <tr key={c.id}>
-                    <td className="p-5 font-mono text-primary font-black tracking-widest">{c.code}</td>
-                    <td className="p-5 text-center font-black text-lg">{c.coins_sq} SQ</td>
-                    <td className="p-5 text-right"><button onClick={async () => { await supabase.from("redeem_links").delete().eq("id", c.id); fetch(); }} className="text-red-500"><Trash2 size={16}/></button></td>
-                  </tr>
-                ))}
-             </tbody>
-          </table>
-       </div>
+    <div className="space-y-4">
+      <button onClick={generate} className="w-full bg-primary py-4 rounded-xl font-black shadow-neon">GENERATE 10 SQ CODE</button>
+      {codes.map(c => (
+        <div key={c.id} className="p-4 bg-[#111] rounded-xl border border-white/5 flex justify-between items-center font-mono">
+           <span className="text-primary font-bold">{c.code}</span>
+           <span className="text-xs">{c.coins_sq} SQ</span>
+        </div>
+      ))}
     </div>
   );
 }
 
 function SettingsTab() {
-  const [s, setS] = useState<any>({});
-  useEffect(() => {
-    supabase.from("app_settings").select("*").then(({ data }) => {
-      const obj: any = {}; data?.forEach(i => obj[i.key] = i.value); setS(obj);
-    });
-  }, []);
-
-  const save = async (key: string, value: any) => {
-    await supabase.from("app_settings").upsert({ key, value });
-    toast.success(`Updated ${key}`);
+  const [rate, setRate] = useState("100");
+  const save = async () => {
+    await supabase.from("app_settings").upsert({ key: "sq_to_tsh", value: rate });
+    toast.success("Settings Saved!");
   };
-
   return (
-    <div className="bg-[#111] p-8 rounded-[2rem] border border-white/5 space-y-8 max-w-2xl mx-auto shadow-2xl">
-       <div>
-          <label className="text-[10px] font-black uppercase text-primary ml-2 tracking-widest">SQ Value (TSh per 1 SQ)</label>
-          <div className="flex gap-3 mt-2">
-             <input value={s.sq_to_tsh || "100"} onChange={e => setS({...s, sq_to_tsh: e.target.value})} className="flex-1 bg-black border border-white/10 p-5 rounded-2xl font-black text-xl" />
-             <button onClick={() => save("sq_to_tsh", s.sq_to_tsh)} className="bg-white text-black px-8 rounded-2xl font-black"><Save/></button>
-          </div>
-       </div>
+    <div className="bg-[#111] p-6 rounded-3xl border border-white/5 space-y-4 max-w-sm">
+      <label className="text-xs font-black uppercase text-muted-foreground">SQ to TSh Exchange Rate</label>
+      <input value={rate} onChange={e => setRate(e.target.value)} className="w-full bg-black border border-white/10 p-4 rounded-xl font-bold" />
+      <button onClick={save} className="w-full bg-white text-black py-4 rounded-xl font-black shadow-lg">SAVE SETTINGS</button>
+    </div>
+  );
+}
+
+function GroupsTab() {
+  const [groups, setGroups] = useState<any[]>([]);
+  const fetch = async () => {
+    const { data } = await supabase.from("groups").select("*");
+    setGroups(data || []);
+  };
+  useEffect(() => { fetch(); }, []);
+  return (
+    <div className="space-y-3">
+      {groups.map(g => (
+        <div key={g.id} className="p-4 bg-[#111] rounded-xl border border-white/5 flex justify-between items-center">
+          <span className="font-bold">{g.name}</span>
+          <button className="text-red-500"><Trash2 size={18}/></button>
+        </div>
+      ))}
     </div>
   );
 }
