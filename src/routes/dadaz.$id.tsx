@@ -1,260 +1,303 @@
-import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
-import { useState, useEffect } from "react";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { 
+  Phone, 
+  MessageCircle, 
+  MapPin, 
+  Heart, 
+  Users, 
+  ArrowLeft, 
+  Lock, 
+  Coins, 
+  ShieldCheck,
+  Star,
+  Image as ImageIcon
+} from "lucide-react";
+import { CoinBadge } from "@/components/CoinBadge";
+import { toast, Toaster } from "sonner";
 
-export const Route = createFileRoute("/auth")({
-  component: AuthPage,
+export const Route = createFileRoute("/dadaz/$id")({
+  component: DadazProfilePage,
 });
 
-function AuthPage() {
+function DadazProfilePage() {
+  const { id } = Route.useParams();
   const navigate = useNavigate();
-  const [mode, setMode] = useState<"signin" | "signup">("signin");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [username, setUsername] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
+  
+  const [profile, setProfile] = useState<any>(null);
+  const [photos, setPhotos] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [unlocked, setUnlocked] = useState(false);
+  const [userId, setUserId] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
 
-  // Check if already logged in
   useEffect(() => {
-    const checkSession = async () => {
-      const { data } = await supabase.auth.getSession();
-      if (data.session) {
-        // Auto-promote admin
-        const adminEmail = import.meta.env.VITE_ADMIN_EMAIL;
-        if (adminEmail && data.session.user?.email === adminEmail) {
-          await supabase
-            .from("user_roles")
-            .upsert(
-              { user_id: data.session.user.id, role: "admin" },
-              { onConflict: "user_id,role" }
-            );
-        }
-        navigate({ to: "/", replace: true });
+    const fetchProfileData = async () => {
+      setLoading(true);
+      const { data: userRes } = await supabase.auth.getUser();
+      const currentUid = userRes.user?.id || null;
+      setUserId(currentUid);
+
+      // 1. Fetch Profile Details
+      const { data: profileData, error: profileError } = await supabase
+        .from("dadaz_profiles")
+        .select("*")
+        .eq("id", id)
+        .maybeSingle();
+
+      if (profileError || !profileData) {
+        toast.error("Profile not found");
+        setLoading(false);
+        return;
       }
+
+      setProfile(profileData);
+
+      // 2. Fetch Gallery Photos
+      const { data: photosData } = await supabase
+        .from("dadaz_photos")
+        .select("*")
+        .eq("dadaz_id", id)
+        .order("sort_order", { ascending: true });
+      
+      setPhotos(photosData || []);
+
+      // 3. Check if contact is already unlocked
+      if (currentUid) {
+        const { data: unlock } = await supabase
+          .from("dadaz_contact_unlocks")
+          .select("id")
+          .eq("dadaz_id", id)
+          .eq("user_id", currentUid)
+          .maybeSingle();
+        
+        if (unlock) setUnlocked(true);
+      }
+      
+      setLoading(false);
     };
-    checkSession();
-  }, [navigate]);
 
-  // Sign In
-  const handleSignIn = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
-    setSuccess(null);
-    setLoading(true);
+    fetchProfileData();
+  }, [id]);
 
-    try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
-      if (error) {
-        setError(error.message);
-        setLoading(false);
-        return;
-      }
-
-      // Auto-promote admin
-      const adminEmail = import.meta.env.VITE_ADMIN_EMAIL;
-      if (adminEmail && data.user?.email === adminEmail) {
-        await supabase
-          .from("user_roles")
-          .upsert(
-            { user_id: data.user.id, role: "admin" },
-            { onConflict: "user_id,role" }
-          );
-      }
-
-      setLoading(false);
-      navigate({ to: "/", replace: true });
-    } catch (err: any) {
-      setError("Network error. Please try again.");
-      setLoading(false);
+  const handleUnlock = async () => {
+    if (!userId) {
+      toast.error("Please login to unlock contacts");
+      navigate({ to: "/auth" });
+      return;
     }
-  };
+    
+    if (unlocked || busy) return;
 
-  // Sign Up
-  const handleSignUp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
-    setSuccess(null);
-    setLoading(true);
+    setBusy(true);
+    const cost = profile.contact_reveal_cost_sq || 10;
 
     try {
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            username: username || email.split("@")[0],
-          },
-        },
+      // Execute the RPC to spend coins
+      const { error: rpcError } = await supabase.rpc("spend_coins", {
+        _user_id: userId,
+        _amount: cost,
+        _kind: "purchase",
+        _ref_id: profile.id,
+        _note: `Unlocked contact for ${profile.username}`,
       });
 
-      if (error) {
-        setError(error.message);
-        setLoading(false);
-        return;
-      }
-
-      if (data.session) {
-        // Auto-promote admin
-        const adminEmail = import.meta.env.VITE_ADMIN_EMAIL;
-        if (adminEmail && data.user?.email === adminEmail) {
-          await supabase
-            .from("user_roles")
-            .upsert(
-              { user_id: data.user.id, role: "admin" },
-              { onConflict: "user_id,role" }
-            );
+      if (rpcError) {
+        if (rpcError.message.includes("insufficient")) {
+          toast.error("Insufficient coins. Please top up your wallet.");
+        } else {
+          toast.error(rpcError.message);
         }
-        setLoading(false);
-        navigate({ to: "/", replace: true });
-      } else {
-        setSuccess("Account created! Please check your email to confirm.");
-        setLoading(false);
-        setMode("signin");
+        setBusy(false);
+        return;
       }
-    } catch (err: any) {
-      setError("Network error. Please try again.");
-      setLoading(false);
+
+      // Record the unlock in the database
+      await supabase.from("dadaz_contact_unlocks").insert({
+        user_id: userId,
+        dadaz_id: profile.id,
+        cost_sq: cost
+      });
+
+      setUnlocked(true);
+      toast.success("Contact information unlocked!");
+    } catch (err) {
+      toast.error("An error occurred. Please try again.");
+    } finally {
+      setBusy(false);
     }
   };
 
-  // GitHub OAuth
-  const handleGitHub = async () => {
-    setError(null);
-    try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: "github",
-        options: {
-          redirectTo: `${window.location.origin}/auth`,
-        },
-      });
-      if (error) setError(error.message);
-    } catch (err: any) {
-      setError("Network error. Please try again.");
-    }
-  };
+  if (loading) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-background">
+        <div className="flex flex-col items-center gap-2">
+          <div className="h-12 w-12 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
+          <p className="text-sm font-bold text-muted-foreground animate-pulse">Loading Profile...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!profile) {
+    return (
+      <div className="flex h-screen flex-col items-center justify-center p-6 text-center">
+        <h2 className="text-xl font-bold">Profile Not Found</h2>
+        <Link to="/dadaz" className="mt-4 text-primary font-bold underline">Go Back</Link>
+      </div>
+    );
+  }
 
   return (
-    <div className="mx-auto max-w-lg px-4 py-6">
-      <Link to="/" className="mb-6 inline-flex items-center gap-1 text-sm text-muted-foreground">
-        <i className="fas fa-arrow-left text-xs mr-1"></i> Back to Home
-      </Link>
-
-      <div className="mb-6 text-center">
-        <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-full bg-[image:var(--gradient-primary)] shadow-[var(--shadow-neon)]">
-          <i className="fas fa-sign-in-alt text-2xl text-primary-foreground"></i>
+    <div className="mx-auto min-h-screen max-w-lg bg-background text-foreground">
+      <Toaster position="top-center" richColors />
+      
+      {/* Dynamic Header */}
+      <header className="fixed top-0 z-50 flex w-full max-w-lg items-center justify-between border-b border-white/10 bg-background/60 px-4 py-3 backdrop-blur-xl">
+        <Link to="/dadaz" className="rounded-full bg-white/5 p-2 text-foreground transition-all active:scale-90">
+          <ArrowLeft size={20} />
+        </Link>
+        <div className="text-center">
+          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-primary">Verified Profile</p>
+          <h1 className="text-sm font-black italic">@{profile.username}</h1>
         </div>
-        <h1 className="bg-[image:var(--gradient-primary)] bg-clip-text text-2xl font-black text-transparent">
-          UTAMU PORI
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          {mode === "signin" ? "Sign in to your account" : "Create a new account"}
+        <CoinBadge />
+      </header>
+
+      <div className="pt-14 pb-32">
+        {/* Hero Section */}
+        <div className="relative aspect-[3/4] w-full overflow-hidden">
+          <img 
+            src={profile.avatar_url || profile.cover_url || "https://via.placeholder.com/600x800"} 
+            alt={profile.username} 
+            className="h-full w-full object-cover" 
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent to-transparent" />
+          
+          {/* Status Badge */}
+          <div className="absolute top-4 right-4">
+             <span className={`flex items-center gap-1 rounded-full px-3 py-1 text-[10px] font-black uppercase shadow-lg backdrop-blur-md ${
+               profile.status === 'service' ? 'bg-primary text-white' : 'bg-secondary text-black'
+             }`}>
+               <ShieldCheck size={12} /> {profile.status || 'Free'}
+             </span>
+          </div>
+        </div>
+
+        {/* Profile Info */}
+        <div className="relative -mt-20 px-4">
+          <div className="rounded-3xl border border-white/10 bg-card/80 p-6 backdrop-blur-xl shadow-2xl">
+            <div className="flex flex-col items-center text-center">
+              <h2 className="text-3xl font-black italic tracking-tight text-white">{profile.username}</h2>
+              <div className="mt-2 flex items-center gap-4 text-xs font-bold text-muted-foreground">
+                <span className="flex items-center gap-1"><MapPin size={14} className="text-secondary" /> {profile.location || "Tanzania"}</span>
+                <span className="h-1 w-1 rounded-full bg-white/20" />
+                <span className="flex items-center gap-1 text-primary"><Star size={14} fill="currentColor" /> Verified</span>
+              </div>
+            </div>
+
+            {/* Stats */}
+            <div className="mt-6 flex justify-around border-y border-white/5 py-4">
+              <div className="text-center">
+                <p className="text-lg font-black text-white">{profile.followers_count?.toLocaleString() || "1.2K"}</p>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Followers</p>
+              </div>
+              <div className="text-center border-x border-white/5 px-8">
+                <p className="text-lg font-black text-white">{profile.likes_count?.toLocaleString() || "8.4K"}</p>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Likes</p>
+              </div>
+              <div className="text-center">
+                <p className="text-lg font-black text-white">{photos.length}</p>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Photos</p>
+              </div>
+            </div>
+
+            {/* About & Services */}
+            <div className="mt-6 space-y-6">
+              <div>
+                <h3 className="text-[10px] font-black uppercase tracking-widest text-primary">About Me</h3>
+                <p className="mt-2 text-sm leading-relaxed text-gray-300">
+                  {profile.bio || "No biography provided."}
+                </p>
+              </div>
+
+              {profile.services && (
+                <div>
+                  <h3 className="text-[10px] font-black uppercase tracking-widest text-secondary">My Services</h3>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {profile.services.split(',').map((s: string, i: number) => (
+                      <span key={i} className="rounded-lg bg-white/5 px-3 py-1.5 text-[11px] font-medium text-white border border-white/5">
+                        {s.trim()}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Photo Gallery */}
+          {photos.length > 0 && (
+            <div className="mt-8">
+              <h3 className="mb-4 flex items-center gap-2 text-sm font-black italic text-white uppercase tracking-wider">
+                <ImageIcon size={16} className="text-primary" /> Private Gallery
+              </h3>
+              <div className="grid grid-cols-2 gap-2">
+                {photos.map((p) => (
+                  <div key={p.id} className="group relative aspect-square overflow-hidden rounded-2xl border border-white/5 bg-muted">
+                    <img 
+                      src={p.image_url} 
+                      alt="Gallery" 
+                      className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110" 
+                      loading="lazy"
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Floating Bottom Contact Bar */}
+      <div className="fixed bottom-0 left-0 right-0 z-50 mx-auto max-w-lg border-t border-white/10 bg-background/80 p-4 backdrop-blur-2xl">
+        {unlocked ? (
+          <div className="flex gap-3">
+            <a 
+              href={`tel:${profile.phone}`} 
+              className="flex-1 flex items-center justify-center gap-2 rounded-2xl bg-secondary py-4 text-sm font-black text-black transition-transform active:scale-95 shadow-[var(--shadow-cyan)]"
+            >
+              <Phone size={18} fill="currentColor" /> CALL NOW
+            </a>
+            <a 
+              href={`https://wa.me/${profile.whatsapp?.replace(/[^0-9]/g, '')}`} 
+              target="_blank" 
+              className="flex-1 flex items-center justify-center gap-2 rounded-2xl bg-green-500 py-4 text-sm font-black text-white transition-transform active:scale-95 shadow-lg shadow-green-500/20"
+            >
+              <MessageCircle size={18} fill="currentColor" /> WHATSAPP
+            </a>
+          </div>
+        ) : (
+          <button 
+            onClick={handleUnlock}
+            disabled={busy}
+            className="group relative flex w-full items-center justify-center gap-3 overflow-hidden rounded-2xl bg-primary py-4 font-black text-white shadow-[var(--shadow-neon)] transition-all active:scale-95 disabled:opacity-70"
+          >
+            {busy ? (
+              <div className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+            ) : (
+              <>
+                <Lock size={18} className="transition-transform group-hover:-translate-y-1" />
+                UNLOCK CONTACT INFO ({profile.contact_reveal_cost_sq || 10} SQ)
+              </>
+            )}
+            <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/20 to-transparent group-hover:animate-[shimmer_1.5s_infinite]" />
+          </button>
+        )}
+        <p className="mt-2 text-center text-[9px] font-bold uppercase tracking-widest text-muted-foreground opacity-50">
+          Discreet Billing & Verified Profiles
         </p>
-      </div>
-
-      <button
-        onClick={handleGitHub}
-        className="mb-4 flex w-full items-center justify-center gap-2 rounded-xl border border-border bg-card py-3 font-semibold text-foreground hover:bg-muted"
-      >
-        <i className="fab fa-github text-xl"></i> Continue with GitHub
-      </button>
-
-      <div className="mb-4 flex items-center gap-3 text-xs text-muted-foreground">
-        <span className="h-px flex-1 bg-border" /> OR <span className="h-px flex-1 bg-border" />
-      </div>
-
-      <form onSubmit={mode === "signin" ? handleSignIn : handleSignUp} className="space-y-3">
-        {mode === "signup" && (
-          <div>
-            <label className="mb-1 block text-xs text-muted-foreground">Username</label>
-            <input
-              type="text"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              placeholder="Your name"
-              className="w-full rounded-xl border border-border bg-input px-3 py-3 text-sm outline-none focus:border-primary"
-            />
-          </div>
-        )}
-
-        <div>
-          <label className="mb-1 block text-xs text-muted-foreground">Email</label>
-          <div className="relative">
-            <i className="fas fa-envelope absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-xs"></i>
-            <input
-              type="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@example.com"
-              className="w-full rounded-xl border border-border bg-input py-3 pl-9 pr-3 text-sm outline-none focus:border-primary"
-            />
-          </div>
-        </div>
-
-        <div>
-          <label className="mb-1 block text-xs text-muted-foreground">Password</label>
-          <div className="relative">
-            <i className="fas fa-lock absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-xs"></i>
-            <input
-              type="password"
-              required
-              minLength={6}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
-              className="w-full rounded-xl border border-border bg-input py-3 pl-9 pr-3 text-sm outline-none focus:border-primary"
-            />
-          </div>
-        </div>
-
-        {error && (
-          <div className="rounded-xl bg-destructive/10 px-3 py-2 text-xs text-destructive">
-            <i className="fas fa-exclamation-circle mr-1"></i> {error}
-          </div>
-        )}
-        {success && (
-          <div className="rounded-xl bg-secondary/10 px-3 py-2 text-xs text-secondary">
-            <i className="fas fa-check-circle mr-1"></i> {success}
-          </div>
-        )}
-
-        <button
-          type="submit"
-          disabled={loading}
-          className="w-full rounded-xl bg-primary py-3 font-bold text-primary-foreground shadow-[var(--shadow-neon)] disabled:opacity-60"
-        >
-          {loading ? <i className="fas fa-spinner fa-spin mr-2"></i> : null}
-          {mode === "signin" ? "Sign In" : "Sign Up"}
-        </button>
-      </form>
-
-      <div className="mt-6 flex flex-wrap items-center justify-center gap-2 text-sm text-muted-foreground">
-        <button
-          onClick={() => {
-            setMode("signin");
-            setError(null);
-            setSuccess(null);
-          }}
-          className="font-semibold text-secondary hover:underline"
-        >
-          Sign In
-        </button>
-        <button
-          onClick={() => {
-            setMode("signup");
-            setError(null);
-            setSuccess(null);
-          }}
-          className="font-semibold text-secondary hover:underline"
-        >
-          Sign Up
-        </button>
       </div>
     </div>
   );
