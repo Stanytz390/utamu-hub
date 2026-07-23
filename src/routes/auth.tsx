@@ -2,7 +2,7 @@ import { createFileRoute, useNavigate, Link, useSearch } from "@tanstack/react-r
 import { useState, useEffect, Component } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
-// Error Boundary
+// Error Boundary to catch crashes
 class ErrorBoundary extends Component<{ children: React.ReactNode }, { hasError: boolean; error: Error | null }> {
   constructor(props: any) {
     super(props);
@@ -15,11 +15,11 @@ class ErrorBoundary extends Component<{ children: React.ReactNode }, { hasError:
     if (this.state.hasError) {
       return (
         <div className="p-6 text-center text-red-600 bg-red-50 rounded-xl max-w-lg mx-auto mt-10">
-          <p className="font-bold">Oops! Something went wrong.</p>
+          <p className="font-bold">Something went wrong.</p>
           <pre className="text-xs mt-2 whitespace-pre-wrap bg-white p-4 rounded border">
             {this.state.error?.message || "Unknown error"}
           </pre>
-          <p className="text-sm mt-4">Check your environment variables (VITE_SUPABASE_URL, VITE_SUPABASE_KEY).</p>
+          <p className="text-sm mt-4">Check environment variables (VITE_SUPABASE_URL, VITE_SUPABASE_KEY).</p>
         </div>
       );
     }
@@ -55,7 +55,7 @@ function AuthPage() {
   const [err, setErr] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
 
-  // Check session on mount
+  // Check session & auto‑promote admin (env var, never displayed)
   useEffect(() => {
     const checkSession = async () => {
       try {
@@ -66,12 +66,7 @@ function AuthPage() {
             await supabase
               .from("profiles")
               .upsert(
-                { 
-                  id: data.session.user.id, 
-                  role: "admin",
-                  email: data.session.user.email,
-                  full_name: data.session.user.user_metadata?.username || "Admin"
-                },
+                { id: data.session.user.id, role: "admin", email: data.session.user.email },
                 { onConflict: "id" }
               );
           }
@@ -95,17 +90,7 @@ function AuthPage() {
       if (error) throw error;
       const adminEmail = import.meta.env.VITE_ADMIN_EMAIL;
       if (adminEmail && data.user.email === adminEmail) {
-        await supabase
-          .from("profiles")
-          .upsert(
-            { 
-              id: data.user.id, 
-              role: "admin",
-              email: data.user.email,
-              full_name: data.user.user_metadata?.username || "Admin"
-            },
-            { onConflict: "id" }
-          );
+        await supabase.from("profiles").upsert({ id: data.user.id, role: "admin" }, { onConflict: "id" });
       }
       navigate({ to: "/", replace: true });
     } catch (e: any) {
@@ -115,7 +100,7 @@ function AuthPage() {
     }
   };
 
-  // Sign Up – no email verification
+  // Sign Up – no verification
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     setErr(null);
@@ -138,17 +123,7 @@ function AuthPage() {
       if (data.session) {
         const adminEmail = import.meta.env.VITE_ADMIN_EMAIL;
         if (adminEmail && data.user?.email === adminEmail) {
-          await supabase
-            .from("profiles")
-            .upsert(
-              { 
-                id: data.user.id, 
-                role: "admin",
-                email: data.user.email,
-                full_name: data.user.user_metadata?.username || "Admin"
-              },
-              { onConflict: "id" }
-            );
+          await supabase.from("profiles").upsert({ id: data.user.id, role: "admin" }, { onConflict: "id" });
         }
         navigate({ to: "/", replace: true });
       } else {
@@ -168,9 +143,7 @@ function AuthPage() {
     try {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "github",
-        options: {
-          redirectTo: `${window.location.origin}/auth`,
-        },
+        options: { redirectTo: `${window.location.origin}/auth` },
       });
       if (error) throw error;
     } catch (e: any) {
@@ -183,20 +156,16 @@ function AuthPage() {
       <Link to="/" className="mb-6 inline-flex items-center gap-1 text-sm text-muted-foreground">
         <i className="fas fa-arrow-left text-xs mr-1"></i> Back to Home
       </Link>
-
       <div className="mb-6 text-center">
         <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-full bg-[image:var(--gradient-primary)] shadow-[var(--shadow-neon)]">
           <i className="fas fa-sign-in-alt text-2xl text-primary-foreground"></i>
         </div>
-        <h1 className="bg-[image:var(--gradient-primary)] bg-clip-text text-2xl font-black text-transparent">
-          UTAMU PORI
-        </h1>
+        <h1 className="bg-[image:var(--gradient-primary)] bg-clip-text text-2xl font-black text-transparent">UTAMU PORI</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           {mode === "signin" ? "Sign in to your account" : "Create a new account"}
         </p>
       </div>
 
-      {/* GitHub Button */}
       <button
         onClick={handleGitHub}
         className="mb-4 flex w-full items-center justify-center gap-2 rounded-xl border border-border bg-card py-3 font-semibold text-foreground hover:bg-muted"
@@ -221,7 +190,6 @@ function AuthPage() {
             />
           </div>
         )}
-
         <div>
           <label className="mb-1 block text-xs text-muted-foreground">Email</label>
           <div className="relative">
@@ -236,7 +204,6 @@ function AuthPage() {
             />
           </div>
         </div>
-
         <div>
           <label className="mb-1 block text-xs text-muted-foreground">Password</label>
           <div className="relative">
@@ -252,10 +219,8 @@ function AuthPage() {
             />
           </div>
         </div>
-
         {err && <p className="rounded-xl bg-destructive/10 px-3 py-2 text-xs text-destructive">{err}</p>}
         {info && <p className="rounded-xl bg-secondary/10 px-3 py-2 text-xs text-secondary">{info}</p>}
-
         <button
           type="submit"
           disabled={loading}
@@ -267,12 +232,8 @@ function AuthPage() {
       </form>
 
       <div className="mt-6 flex flex-wrap items-center justify-center gap-2 text-sm text-muted-foreground">
-        <button onClick={() => setMode("signin")} className="font-semibold text-secondary hover:underline">
-          Sign In
-        </button>
-        <button onClick={() => setMode("signup")} className="font-semibold text-secondary hover:underline">
-          Sign Up
-        </button>
+        <button onClick={() => setMode("signin")} className="font-semibold text-secondary hover:underline">Sign In</button>
+        <button onClick={() => setMode("signup")} className="font-semibold text-secondary hover:underline">Sign Up</button>
       </div>
     </div>
   );
