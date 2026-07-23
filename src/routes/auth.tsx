@@ -3,11 +3,14 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/auth")({
-  validateSearch: (s: Record<string, unknown>) => ({ ref: typeof s.ref === "string" ? s.ref : undefined }),
+  validateSearch: (s: Record<string, unknown>) => ({ 
+    ref: typeof s.ref === "string" ? s.ref : undefined,
+    magic: typeof s.magic === "string" ? s.magic : undefined,
+  }),
   head: () => ({
     meta: [
       { title: "Sign in · UTAMU PORI" },
-      { name: "description", content: "Ingia au fungua account yako ya UTAMU PORI." },
+      { name: "description", content: "Sign in or create your account." },
     ],
   }),
   component: AuthPage,
@@ -15,8 +18,8 @@ export const Route = createFileRoute("/auth")({
 
 function AuthPage() {
   const navigate = useNavigate();
-  const { ref } = useSearch({ from: "/auth" });
-  const [mode, setMode] = useState<"signin" | "signup">("signin");
+  const { ref, magic } = useSearch({ from: "/auth" });
+  const [mode, setMode] = useState<"signin" | "signup" | "magic">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [username, setUsername] = useState("");
@@ -24,56 +27,108 @@ function AuthPage() {
   const [err, setErr] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
 
+  // Handle magic link verification on page load
   useEffect(() => {
-    if (ref) setMode("signup");
+    if (magic) {
+      // Magic link callback – Supabase handles this automatically if redirectTo is set
+      // We'll just show a success message and redirect
+      setInfo("Magic link verified! You are now signed in.");
+      setTimeout(() => navigate({ to: "/" }), 2000);
+    }
+  }, [magic, navigate]);
+
+  // Redirect if already logged in
+  useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
       if (data.user) navigate({ to: "/", replace: true });
     });
-  }, [navigate, ref]);
+  }, [navigate]);
 
-  const onSubmit = async (e: React.FormEvent) => {
+  // Sign in with email + password
+  const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setErr(null);
     setInfo(null);
     setLoading(true);
     try {
-      if (mode === "signup") {
-        const { error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            emailRedirectTo: window.location.origin,
-            data: { 
-              username: username || email.split("@")[0],
-              referral_code: ref ?? null 
-            },
-          },
-        });
-        if (error) throw error;
-        if (ref && typeof window !== "undefined") sessionStorage.setItem("pending_ref", ref);
-        setInfo("Account created. Check your email for confirmation.");
-      } else {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) throw error;
-        navigate({ to: "/", replace: true });
-      }
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) throw error;
+      navigate({ to: "/", replace: true });
     } catch (e: unknown) {
-      setErr(e instanceof Error ? e.message : "Something went wrong");
+      setErr(e instanceof Error ? e.message : "Sign in failed");
     } finally {
       setLoading(false);
     }
   };
 
-  const onGoogle = async () => {
+  // Sign up with email + password
+  const handleSignUp = async (e: React.FormEvent) => {
+    e.preventDefault();
     setErr(null);
-    if (ref && typeof window !== "undefined") sessionStorage.setItem("pending_ref", ref);
+    setInfo(null);
+    setLoading(true);
+    try {
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          emailRedirectTo: `${window.location.origin}/auth?magic=true`,
+          data: { 
+            username: username || email.split("@")[0],
+            referral_code: ref ?? null 
+          },
+        },
+      });
+      if (error) throw error;
+      if (ref && typeof window !== "undefined") sessionStorage.setItem("pending_ref", ref);
+      setInfo("Account created! Check your email for a magic link to verify and sign in.");
+    } catch (e: unknown) {
+      setErr(e instanceof Error ? e.message : "Sign up failed");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Send magic link (passwordless)
+  const handleMagicLink = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErr(null);
+    setInfo(null);
+    setLoading(true);
+    try {
+      const { error } = await supabase.auth.signInWithOtp({
+        email,
+        options: {
+          emailRedirectTo: `${window.location.origin}/auth?magic=true`,
+        },
+      });
+      if (error) throw error;
+      setInfo("Magic link sent! Check your email to sign in.");
+    } catch (e: unknown) {
+      setErr(e instanceof Error ? e.message : "Failed to send magic link");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // GitHub OAuth (no card required)
+  const handleGitHub = async () => {
+    setErr(null);
     const { error } = await supabase.auth.signInWithOAuth({
-      provider: "google",
+      provider: "github",
       options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
+        redirectTo: `${window.location.origin}/auth?magic=true`,
       },
     });
     if (error) setErr(error.message);
+  };
+
+  // Switch mode and clear messages
+  const switchMode = (newMode: "signin" | "signup" | "magic") => {
+    setMode(newMode);
+    setErr(null);
+    setInfo(null);
+    setPassword("");
   };
 
   return (
@@ -81,6 +136,7 @@ function AuthPage() {
       <Link to="/" className="mb-6 inline-flex items-center gap-1 text-sm text-muted-foreground">
         <i className="fas fa-arrow-left text-xs mr-1"></i> Back to Home
       </Link>
+
       <div className="mb-6 text-center">
         <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-full bg-[image:var(--gradient-primary)] shadow-[var(--shadow-neon)]">
           <i className="fas fa-sign-in-alt text-2xl text-primary-foreground"></i>
@@ -89,28 +145,26 @@ function AuthPage() {
           UTAMU PORI
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          {mode === "signin" ? "Sign in to your account" : "Create a new account"}
+          {mode === "signin" && "Sign in to your account"}
+          {mode === "signup" && "Create a new account"}
+          {mode === "magic" && "Sign in with a magic link"}
         </p>
       </div>
 
+      {/* GitHub OAuth Button */}
       <button
-        onClick={onGoogle}
+        onClick={handleGitHub}
         className="mb-4 flex w-full items-center justify-center gap-2 rounded-xl border border-border bg-card py-3 font-semibold text-foreground hover:bg-muted"
       >
-        <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true">
-          <path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.8 32.4 29.3 35.5 24 35.5c-6.4 0-11.5-5.1-11.5-11.5S17.6 12.5 24 12.5c2.9 0 5.6 1.1 7.6 2.9l5.7-5.7C33.7 6.1 29.1 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.2-.1-2.3-.4-3.5z"/>
-          <path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.7 19 12.5 24 12.5c2.9 0 5.6 1.1 7.6 2.9l5.7-5.7C33.7 6.1 29.1 4 24 4 16.3 4 9.7 8.4 6.3 14.7z"/>
-          <path fill="#4CAF50" d="M24 44c5 0 9.6-1.9 13.1-5l-6.1-5c-1.9 1.4-4.3 2.3-7 2.3-5.3 0-9.8-3.6-11.3-8.4l-6.5 5C9.5 39.6 16.1 44 24 44z"/>
-          <path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.3-2.3 4.3-4.2 5.7l6.1 5C41.6 34.3 44 29.6 44 24c0-1.2-.1-2.3-.4-3.5z"/>
-        </svg>
-        Continue with Google
+        <i className="fab fa-github text-xl"></i> Continue with GitHub
       </button>
 
       <div className="mb-4 flex items-center gap-3 text-xs text-muted-foreground">
         <span className="h-px flex-1 bg-border" /> OR <span className="h-px flex-1 bg-border" />
       </div>
 
-      <form onSubmit={onSubmit} className="space-y-3">
+      {/* Auth Form */}
+      <form onSubmit={mode === "signin" ? handleSignIn : mode === "signup" ? handleSignUp : handleMagicLink} className="space-y-3">
         {mode === "signup" && (
           <div>
             <label className="mb-1 block text-xs text-muted-foreground">Username</label>
@@ -123,6 +177,7 @@ function AuthPage() {
             />
           </div>
         )}
+
         <div>
           <label className="mb-1 block text-xs text-muted-foreground">Email</label>
           <div className="relative">
@@ -137,21 +192,24 @@ function AuthPage() {
             />
           </div>
         </div>
-        <div>
-          <label className="mb-1 block text-xs text-muted-foreground">Password</label>
-          <div className="relative">
-            <i className="fas fa-lock absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-xs"></i>
-            <input
-              type="password"
-              required
-              minLength={6}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
-              className="w-full rounded-xl border border-border bg-input py-3 pl-9 pr-3 text-sm outline-none focus:border-primary"
-            />
+
+        {mode !== "magic" && (
+          <div>
+            <label className="mb-1 block text-xs text-muted-foreground">Password</label>
+            <div className="relative">
+              <i className="fas fa-lock absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-xs"></i>
+              <input
+                type="password"
+                required
+                minLength={6}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                className="w-full rounded-xl border border-border bg-input py-3 pl-9 pr-3 text-sm outline-none focus:border-primary"
+              />
+            </div>
           </div>
-        </div>
+        )}
 
         {err && (
           <p className="rounded-xl bg-destructive/10 px-3 py-2 text-xs text-destructive">{err}</p>
@@ -166,19 +224,43 @@ function AuthPage() {
           className="w-full rounded-xl bg-primary py-3 font-bold text-primary-foreground shadow-[var(--shadow-neon)] disabled:opacity-60"
         >
           {loading ? <i className="fas fa-spinner fa-spin mr-2"></i> : null}
-          {mode === "signin" ? "Sign in" : "Sign up"}
+          {mode === "signin" && "Sign In"}
+          {mode === "signup" && "Sign Up"}
+          {mode === "magic" && "Send Magic Link"}
         </button>
       </form>
 
-      <p className="mt-6 text-center text-sm text-muted-foreground">
-        {mode === "signin" ? "Don't have an account?" : "Already have an account?"}{" "}
-        <button
-          onClick={() => setMode(mode === "signin" ? "signup" : "signin")}
-          className="font-semibold text-secondary"
-        >
-          {mode === "signin" ? "Sign up" : "Sign in"}
-        </button>
-      </p>
+      {/* Mode Switcher */}
+      <div className="mt-6 flex flex-wrap items-center justify-center gap-2 text-sm text-muted-foreground">
+        {mode !== "signin" && (
+          <button onClick={() => switchMode("signin")} className="font-semibold text-secondary hover:underline">
+            Sign In
+          </button>
+        )}
+        {mode !== "signup" && (
+          <button onClick={() => switchMode("signup")} className="font-semibold text-secondary hover:underline">
+            Sign Up
+          </button>
+        )}
+        {mode !== "magic" && (
+          <button onClick={() => switchMode("magic")} className="font-semibold text-secondary hover:underline">
+            Magic Link
+          </button>
+        )}
+      </div>
+
+      {/* Help Text */}
+      <div className="mt-4 text-center text-xs text-muted-foreground">
+        {mode === "magic" && (
+          <p>We'll email you a secure link to sign in instantly.</p>
+        )}
+        {mode === "signin" && (
+          <p>Don't have an account? <button onClick={() => switchMode("signup")} className="font-semibold text-secondary">Sign Up</button></p>
+        )}
+        {mode === "signup" && (
+          <p>Already have an account? <button onClick={() => switchMode("signin")} className="font-semibold text-secondary">Sign In</button></p>
+        )}
+      </div>
     </div>
   );
 }
