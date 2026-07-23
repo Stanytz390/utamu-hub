@@ -5,7 +5,6 @@ import { supabase } from "@/integrations/supabase/client";
 export const Route = createFileRoute("/auth")({
   validateSearch: (s: Record<string, unknown>) => ({
     ref: typeof s.ref === "string" ? s.ref : undefined,
-    magic: typeof s.magic === "string" ? s.magic : undefined,
   }),
   head: () => ({
     meta: [
@@ -18,8 +17,8 @@ export const Route = createFileRoute("/auth")({
 
 function AuthPage() {
   const navigate = useNavigate();
-  const { ref, magic } = useSearch({ from: "/auth" });
-  const [mode, setMode] = useState<"signin" | "signup" | "magic">("signin");
+  const { ref } = useSearch({ from: "/auth" });
+  const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [username, setUsername] = useState("");
@@ -38,22 +37,7 @@ function AuthPage() {
     checkSession();
   }, [navigate]);
 
-  // Handle magic link callback
-  useEffect(() => {
-    if (magic === "true") {
-      const check = async () => {
-        const { data } = await supabase.auth.getSession();
-        if (data.session) {
-          navigate({ to: "/", replace: true });
-        } else {
-          setErr("Magic link verification failed. Please try again.");
-        }
-      };
-      check();
-    }
-  }, [magic, navigate]);
-
-  // Sign in with email + password
+  // Sign In
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setErr(null);
@@ -70,18 +54,17 @@ function AuthPage() {
     }
   };
 
-  // Sign up with email + password (sends confirmation email)
+  // Sign Up (no email verification – logs in immediately)
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     setErr(null);
     setInfo(null);
     setLoading(true);
     try {
-      const { error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
-          emailRedirectTo: `${window.location.origin}/auth?magic=true`,
           data: {
             username: username || email.split("@")[0],
             referral_code: ref ?? null,
@@ -89,8 +72,13 @@ function AuthPage() {
         },
       });
       if (error) throw error;
-      if (ref) sessionStorage.setItem("pending_ref", ref);
-      setInfo("Account created! Check your email for a confirmation link.");
+      // If sign-up is successful and email confirmation is OFF, the user is already logged in.
+      if (data.session) {
+        navigate({ to: "/", replace: true });
+      } else {
+        // Fallback: just redirect to home
+        navigate({ to: "/" });
+      }
     } catch (e: any) {
       setErr(e.message || "Sign up failed");
     } finally {
@@ -98,7 +86,7 @@ function AuthPage() {
     }
   };
 
-  // Magic link (passwordless)
+  // Magic Link (optional – still works but no verification required)
   const handleMagicLink = async (e: React.FormEvent) => {
     e.preventDefault();
     setErr(null);
@@ -150,12 +138,11 @@ function AuthPage() {
           UTAMU PORI
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          {mode === "signin" && "Sign in to your account"}
-          {mode === "signup" && "Create a new account"}
-          {mode === "magic" && "Sign in with a magic link"}
+          {mode === "signin" ? "Sign in to your account" : "Create a new account"}
         </p>
       </div>
 
+      {/* GitHub Button with Logo */}
       <button
         onClick={handleGitHub}
         className="mb-4 flex w-full items-center justify-center gap-2 rounded-xl border border-border bg-card py-3 font-semibold text-foreground hover:bg-muted"
@@ -167,10 +154,7 @@ function AuthPage() {
         <span className="h-px flex-1 bg-border" /> OR <span className="h-px flex-1 bg-border" />
       </div>
 
-      <form
-        onSubmit={mode === "signin" ? handleSignIn : mode === "signup" ? handleSignUp : handleMagicLink}
-        className="space-y-3"
-      >
+      <form onSubmit={mode === "signin" ? handleSignIn : handleSignUp} className="space-y-3">
         {mode === "signup" && (
           <div>
             <label className="mb-1 block text-xs text-muted-foreground">Username</label>
@@ -199,23 +183,21 @@ function AuthPage() {
           </div>
         </div>
 
-        {mode !== "magic" && (
-          <div>
-            <label className="mb-1 block text-xs text-muted-foreground">Password</label>
-            <div className="relative">
-              <i className="fas fa-lock absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-xs"></i>
-              <input
-                type="password"
-                required
-                minLength={6}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                className="w-full rounded-xl border border-border bg-input py-3 pl-9 pr-3 text-sm outline-none focus:border-primary"
-              />
-            </div>
+        <div>
+          <label className="mb-1 block text-xs text-muted-foreground">Password</label>
+          <div className="relative">
+            <i className="fas fa-lock absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-xs"></i>
+            <input
+              type="password"
+              required
+              minLength={6}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="••••••••"
+              className="w-full rounded-xl border border-border bg-input py-3 pl-9 pr-3 text-sm outline-none focus:border-primary"
+            />
           </div>
-        )}
+        </div>
 
         {err && <p className="rounded-xl bg-destructive/10 px-3 py-2 text-xs text-destructive">{err}</p>}
         {info && <p className="rounded-xl bg-secondary/10 px-3 py-2 text-xs text-secondary">{info}</p>}
@@ -226,11 +208,19 @@ function AuthPage() {
           className="w-full rounded-xl bg-primary py-3 font-bold text-primary-foreground shadow-[var(--shadow-neon)] disabled:opacity-60"
         >
           {loading ? <i className="fas fa-spinner fa-spin mr-2"></i> : null}
-          {mode === "signin" && "Sign In"}
-          {mode === "signup" && "Sign Up"}
-          {mode === "magic" && "Send Magic Link"}
+          {mode === "signin" ? "Sign In" : "Sign Up"}
         </button>
       </form>
+
+      {/* Magic Link (optional) */}
+      <div className="mt-4 text-center">
+        <button
+          onClick={handleMagicLink}
+          className="text-xs text-muted-foreground hover:underline"
+        >
+          Forgot password? Use Magic Link
+        </button>
+      </div>
 
       <div className="mt-6 flex flex-wrap items-center justify-center gap-2 text-sm text-muted-foreground">
         <button onClick={() => setMode("signin")} className="font-semibold text-secondary hover:underline">
@@ -238,9 +228,6 @@ function AuthPage() {
         </button>
         <button onClick={() => setMode("signup")} className="font-semibold text-secondary hover:underline">
           Sign Up
-        </button>
-        <button onClick={() => setMode("magic")} className="font-semibold text-secondary hover:underline">
-          Magic Link
         </button>
       </div>
     </div>
