@@ -2,6 +2,8 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
+const ADMIN_PASSWORD = "STANY#MINES";
+
 // ============================================================
 // ROUTE – Client-side only
 // ============================================================
@@ -11,77 +13,91 @@ export const Route = createFileRoute("/admin")({
 });
 
 // ============================================================
-// ADMIN DASHBOARD
+// MAIN ADMIN COMPONENT
 // ============================================================
 function AdminDashboard() {
   const navigate = useNavigate();
-  const [loading, setLoading] = useState(true);
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [authenticated, setAuthenticated] = useState(false);
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
   const [activeTab, setActiveTab] = useState("dashboard");
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [stats, setStats] = useState({ users: 0, videos: 0, groups: 0, dadaz: 0 });
+  const [loadingStats, setLoadingStats] = useState(true);
 
   useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) {
-          navigate({ to: "/auth" });
-          return;
-        }
+    const isAuth = localStorage.getItem("admin_authenticated") === "true";
+    setAuthenticated(isAuth);
+    if (isAuth) fetchStats();
+  }, []);
 
-        // Auto-promote admin if email matches environment variable
-        const adminEmail = import.meta.env.VITE_ADMIN_EMAIL;
-        let isAdminUser = false;
+  const fetchStats = async () => {
+    try {
+      setLoadingStats(true);
+      const { count: u } = await supabase.from("profiles").select("*", { count: "exact", head: true });
+      const { count: v } = await supabase.from("videos").select("*", { count: "exact", head: true });
+      const { count: g } = await supabase.from("groups").select("*", { count: "exact", head: true });
+      const { count: d } = await supabase.from("dadaz_profiles").select("*", { count: "exact", head: true });
+      setStats({ users: u || 0, videos: v || 0, groups: g || 0, dadaz: d || 0 });
+    } catch (e) {
+      console.error("Stats error:", e);
+    } finally {
+      setLoadingStats(false);
+    }
+  };
 
-        // Check user_roles first
-        const { data: roleData } = await supabase
-          .from("user_roles")
-          .select("role")
-          .eq("user_id", user.id)
-          .eq("role", "admin")
-          .maybeSingle();
+  const handlePasswordSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (password === ADMIN_PASSWORD) {
+      localStorage.setItem("admin_authenticated", "true");
+      setAuthenticated(true);
+      setError("");
+      fetchStats();
+    } else {
+      setError("Incorrect password.");
+    }
+  };
 
-        if (roleData) {
-          isAdminUser = true;
-        } else if (adminEmail && user.email === adminEmail) {
-          // If email matches, insert admin role and set as admin
-          const { error } = await supabase
-            .from("user_roles")
-            .insert({ user_id: user.id, role: "admin" });
-          if (!error) {
-            isAdminUser = true;
-          } else {
-            console.error("Failed to insert admin role:", error);
-            // Fallback: treat as admin anyway for this session
-            isAdminUser = true;
-          }
-        }
+  const signOut = () => {
+    localStorage.removeItem("admin_authenticated");
+    setAuthenticated(false);
+    navigate({ to: "/" });
+  };
 
-        if (!isAdminUser) {
-          alert("You are not an admin.");
-          navigate({ to: "/" });
-          return;
-        }
-
-        setIsAdmin(true);
-        // Fetch stats
-        const { count: u } = await supabase.from("profiles").select("*", { count: "exact", head: true });
-        const { count: v } = await supabase.from("videos").select("*", { count: "exact", head: true });
-        const { count: g } = await supabase.from("groups").select("*", { count: "exact", head: true });
-        const { count: d } = await supabase.from("dadaz_profiles").select("*", { count: "exact", head: true });
-        setStats({ users: u || 0, videos: v || 0, groups: g || 0, dadaz: d || 0 });
-      } catch (error) {
-        console.error("Auth check error:", error);
-        alert("An error occurred. Please try again.");
-        navigate({ to: "/" });
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    checkAuth();
-  }, [navigate]);
+  if (!authenticated) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-[#050505] px-4">
+        <div className="max-w-md w-full bg-[#111] rounded-3xl border border-white/5 p-8 shadow-xl">
+          <div className="text-center mb-6">
+            <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-full bg-[image:var(--gradient-primary)] shadow-[var(--shadow-neon)]">
+              <i className="fas fa-lock text-2xl text-primary-foreground"></i>
+            </div>
+            <h1 className="text-2xl font-black bg-[image:var(--gradient-primary)] bg-clip-text text-transparent">
+              Admin Access
+            </h1>
+            <p className="text-sm text-muted-foreground mt-1">Enter the admin password</p>
+          </div>
+          <form onSubmit={handlePasswordSubmit}>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="••••••••"
+              className="w-full rounded-xl border border-white/10 bg-black/50 p-4 text-white outline-none focus:border-primary"
+              autoFocus
+            />
+            {error && <p className="text-red-400 text-sm mt-2">{error}</p>}
+            <button
+              type="submit"
+              className="mt-4 w-full rounded-xl bg-primary py-4 font-bold text-primary-foreground shadow-[var(--shadow-neon)] hover:opacity-90 transition"
+            >
+              Unlock
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
 
   const menuItems = [
     { id: "dashboard", label: "Dashboard", icon: "fa-chart-line" },
@@ -93,32 +109,6 @@ function AdminDashboard() {
   ];
 
   const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
-
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center min-h-screen bg-[#050505] text-white">
-        <div className="text-center">
-          <i className="fas fa-spinner fa-spin text-4xl text-primary"></i>
-          <p className="mt-4 text-muted-foreground">Loading admin panel...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!isAdmin) {
-    return (
-      <div className="flex justify-center items-center min-h-screen bg-[#050505] text-white">
-        <div className="text-center">
-          <i className="fas fa-exclamation-triangle text-4xl text-red-500"></i>
-          <p className="mt-4 text-xl font-bold">Access Denied</p>
-          <p className="text-muted-foreground">You are not authorized to view this page.</p>
-          <button onClick={() => navigate({ to: "/" })} className="mt-4 bg-primary px-6 py-2 rounded-lg">
-            Go Home
-          </button>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="flex min-h-screen bg-[#050505] text-white font-sans">
@@ -135,12 +125,10 @@ function AdminDashboard() {
         </button>
       </div>
 
-      {/* Sidebar Overlay */}
       {isSidebarOpen && (
         <div className="fixed inset-0 bg-black/80 z-40 md:hidden" onClick={toggleSidebar} />
       )}
 
-      {/* Sidebar */}
       <aside className={`
         fixed md:relative z-50 w-64 h-full bg-[#111] border-r border-white/5 transform transition-transform duration-300
         ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"} md:translate-x-0
@@ -149,7 +137,6 @@ function AdminDashboard() {
           <h1 className="text-xl font-black italic tracking-tighter text-transparent bg-clip-text bg-[image:var(--gradient-primary)]">UTAMU PORI</h1>
           <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-1">Super Administrator</p>
         </div>
-        
         <nav className="p-4 space-y-1.5 mt-16 md:mt-0">
           {menuItems.map((item) => (
             <button
@@ -164,32 +151,33 @@ function AdminDashboard() {
             </button>
           ))}
         </nav>
-
         <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-white/5">
-          <button 
-            onClick={() => supabase.auth.signOut().then(() => navigate({to: '/auth'}))} 
-            className="flex items-center gap-3 w-full px-4 py-3 text-sm font-bold text-red-400 hover:bg-red-500/10 rounded-2xl transition-all"
-          >
-            <i className="fas fa-sign-out-alt"></i> Logout
+          <button onClick={signOut} className="flex items-center gap-3 w-full px-4 py-3 text-sm font-bold text-red-400 hover:bg-red-500/10 rounded-2xl transition-all">
+            <i className="fas fa-sign-out-alt"></i> Lock Screen
           </button>
         </div>
       </aside>
 
-      {/* Main Content */}
       <main className="flex-1 w-full p-4 md:p-10 mt-16 md:mt-0 overflow-x-hidden">
         <header className="mb-8 hidden md:block">
           <h2 className="text-3xl font-black">{menuItems.find(m => m.id === activeTab)?.label}</h2>
           <p className="text-muted-foreground text-sm">Welcome back, Admin.</p>
         </header>
 
-        <>
-          {activeTab === "dashboard" && <DashboardContent stats={stats} />}
-          {activeTab === "videos" && <VideosContent />}
-          {activeTab === "dadaz" && <DadazContent />}
-          {activeTab === "groups" && <GroupsContent />}
-          {activeTab === "redeem" && <RedeemContent />}
-          {activeTab === "settings" && <SettingsContent />}
-        </>
+        {loadingStats ? (
+          <div className="flex justify-center items-center h-40">
+            <i className="fas fa-spinner fa-spin text-2xl text-primary"></i>
+          </div>
+        ) : (
+          <>
+            {activeTab === "dashboard" && <DashboardContent stats={stats} />}
+            {activeTab === "videos" && <VideosContent />}
+            {activeTab === "dadaz" && <DadazContent />}
+            {activeTab === "groups" && <GroupsContent />}
+            {activeTab === "redeem" && <RedeemContent />}
+            {activeTab === "settings" && <SettingsContent />}
+          </>
+        )}
       </main>
     </div>
   );
@@ -205,7 +193,6 @@ function DashboardContent({ stats }: { stats: any }) {
     { label: "Total Groups", value: stats.groups, icon: "fa-users", color: "text-secondary" },
     { label: "Total Dadaz", value: stats.dadaz, icon: "fa-user-check", color: "text-purple-400" },
   ];
-
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-6">
       {cards.map((c, i) => (
@@ -220,7 +207,7 @@ function DashboardContent({ stats }: { stats: any }) {
 }
 
 // ============================================================
-// 2. MANAGE VIDEOS
+// 2. MANAGE VIDEOS – Full CRUD
 // ============================================================
 function VideosContent() {
   const [vids, setVids] = useState<any[]>([]);
@@ -233,11 +220,8 @@ function VideosContent() {
       setLoading(true);
       const { data } = await supabase.from("videos").select("*").order("created_at", { ascending: false });
       setVids(data || []);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoading(false);
-    }
+    } catch (e) { console.error(e); }
+    finally { setLoading(false); }
   };
 
   useEffect(() => { fetchVids(); }, []);
@@ -259,9 +243,7 @@ function VideosContent() {
       setShowAdd(false);
       setForm({ title: "", video_url: "", thumbnail_url: "", price_sq: 0 });
       fetchVids();
-    } catch (err: any) {
-      alert("Error: " + err.message);
-    }
+    } catch (err: any) { alert("Error: " + err.message); }
   };
 
   const deleteVideo = async (id: string) => {
@@ -270,9 +252,7 @@ function VideosContent() {
       await supabase.from("videos").delete().eq("id", id);
       alert("Video deleted");
       fetchVids();
-    } catch (err: any) {
-      alert("Error: " + err.message);
-    }
+    } catch (err: any) { alert("Error: " + err.message); }
   };
 
   if (loading) return <div className="flex justify-center items-center h-40"><i className="fas fa-spinner fa-spin text-2xl text-primary"></i></div>;
@@ -328,11 +308,8 @@ function DadazContent() {
       setLoading(true);
       const { data } = await supabase.from("dadaz_profiles").select("*").order("created_at", { ascending: false });
       setDadaz(data || []);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoading(false);
-    }
+    } catch (e) { console.error(e); }
+    finally { setLoading(false); }
   };
 
   useEffect(() => { fetchDadaz(); }, []);
@@ -342,9 +319,7 @@ function DadazContent() {
       await supabase.from("dadaz_profiles").update({ is_admin_approved: !current }).eq("id", id);
       alert(!current ? "Approved!" : "Unapproved");
       fetchDadaz();
-    } catch (err: any) {
-      alert("Error: " + err.message);
-    }
+    } catch (err: any) { alert("Error: " + err.message); }
   };
 
   const deleteDadaz = async (id: string) => {
@@ -353,9 +328,7 @@ function DadazContent() {
       await supabase.from("dadaz_profiles").delete().eq("id", id);
       alert("Deleted");
       fetchDadaz();
-    } catch (err: any) {
-      alert("Error: " + err.message);
-    }
+    } catch (err: any) { alert("Error: " + err.message); }
   };
 
   if (loading) return <div className="flex justify-center items-center h-40"><i className="fas fa-spinner fa-spin text-2xl text-primary"></i></div>;
@@ -406,11 +379,8 @@ function GroupsContent() {
       setLoading(true);
       const { data } = await supabase.from("groups").select("*").order("created_at", { ascending: false });
       setGroups(data || []);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoading(false);
-    }
+    } catch (e) { console.error(e); }
+    finally { setLoading(false); }
   };
 
   useEffect(() => { fetchGroups(); }, []);
@@ -430,9 +400,7 @@ function GroupsContent() {
       setShowAdd(false);
       setForm({ name: "", link: "", description: "" });
       fetchGroups();
-    } catch (err: any) {
-      alert("Error: " + err.message);
-    }
+    } catch (err: any) { alert("Error: " + err.message); }
   };
 
   const deleteGroup = async (id: string) => {
@@ -441,9 +409,7 @@ function GroupsContent() {
       await supabase.from("groups").delete().eq("id", id);
       alert("Deleted");
       fetchGroups();
-    } catch (err: any) {
-      alert("Error: " + err.message);
-    }
+    } catch (err: any) { alert("Error: " + err.message); }
   };
 
   if (loading) return <div className="flex justify-center items-center h-40"><i className="fas fa-spinner fa-spin text-2xl text-primary"></i></div>;
@@ -492,11 +458,8 @@ function RedeemContent() {
       setLoading(true);
       const { data } = await supabase.from("redeem_links").select("*").order("created_at", { ascending: false });
       setCodes(data || []);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoading(false);
-    }
+    } catch (e) { console.error(e); }
+    finally { setLoading(false); }
   };
 
   useEffect(() => { fetchCodes(); }, []);
@@ -510,9 +473,7 @@ function RedeemContent() {
       if (error) throw error;
       alert("Code Created!");
       fetchCodes();
-    } catch (err: any) {
-      alert("Error: " + err.message);
-    }
+    } catch (err: any) { alert("Error: " + err.message); }
   };
 
   const deleteCode = async (id: string) => {
@@ -521,9 +482,7 @@ function RedeemContent() {
       await supabase.from("redeem_links").delete().eq("id", id);
       alert("Deleted");
       fetchCodes();
-    } catch (err: any) {
-      alert("Error: " + err.message);
-    }
+    } catch (err: any) { alert("Error: " + err.message); }
   };
 
   if (loading) return <div className="flex justify-center items-center h-40"><i className="fas fa-spinner fa-spin text-2xl text-primary"></i></div>;
@@ -548,12 +507,7 @@ function RedeemContent() {
       <div className="bg-[#111] rounded-3xl border border-white/5 overflow-hidden">
         <table className="w-full text-xs text-left">
           <thead className="bg-white/5">
-            <tr>
-              <th className="p-4">CODE</th>
-              <th className="p-4">SQ</th>
-              <th className="p-4">USES</th>
-              <th className="p-4"></th>
-            </tr>
+            <tr><th className="p-4">CODE</th><th className="p-4">SQ</th><th className="p-4">USES</th><th className="p-4"></th></tr>
           </thead>
           <tbody className="divide-y divide-white/5">
             {codes.map(c => (
@@ -588,11 +542,8 @@ function SettingsContent() {
         const s: any = {};
         data?.forEach(item => s[item.key] = item.value);
         setSettings(s);
-      } catch (e) {
-        console.error(e);
-      } finally {
-        setLoading(false);
-      }
+      } catch (e) { console.error(e); }
+      finally { setLoading(false); }
     };
     fetch();
   }, []);
@@ -602,9 +553,7 @@ function SettingsContent() {
       const { error } = await supabase.from("app_settings").upsert({ key, value });
       if (error) throw error;
       alert(`Updated ${key}!`);
-    } catch (err: any) {
-      alert("Error: " + err.message);
-    }
+    } catch (err: any) { alert("Error: " + err.message); }
   };
 
   if (loading) return <div className="flex justify-center items-center h-40"><i className="fas fa-spinner fa-spin text-2xl text-primary"></i></div>;
