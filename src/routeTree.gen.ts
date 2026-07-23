@@ -16,6 +16,8 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as DadazIdRouteImport } from './routes/dadaz.$id'
+import { Route as AuthenticatedWalletRouteImport } from './routes/_authenticated/wallet'
+import { Route as AuthenticatedRedeemRouteImport } from './routes/_authenticated/redeem'
 import { Route as AuthenticatedProfileRouteImport } from './routes/_authenticated/profile'
 
 const UtamuRoute = UtamuRouteImport.update({
@@ -52,6 +54,16 @@ const DadazIdRoute = DadazIdRouteImport.update({
   path: '/$id',
   getParentRoute: () => DadazRoute,
 } as any)
+const AuthenticatedWalletRoute = AuthenticatedWalletRouteImport.update({
+  id: '/wallet',
+  path: '/wallet',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedRedeemRoute = AuthenticatedRedeemRouteImport.update({
+  id: '/redeem',
+  path: '/redeem',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedProfileRoute = AuthenticatedProfileRouteImport.update({
   id: '/profile',
   path: '/profile',
@@ -65,6 +77,8 @@ export interface FileRoutesByFullPath {
   '/groups': typeof GroupsRoute
   '/utamu': typeof UtamuRoute
   '/profile': typeof AuthenticatedProfileRoute
+  '/redeem': typeof AuthenticatedRedeemRoute
+  '/wallet': typeof AuthenticatedWalletRoute
   '/dadaz/$id': typeof DadazIdRoute
 }
 export interface FileRoutesByTo {
@@ -74,6 +88,8 @@ export interface FileRoutesByTo {
   '/groups': typeof GroupsRoute
   '/utamu': typeof UtamuRoute
   '/profile': typeof AuthenticatedProfileRoute
+  '/redeem': typeof AuthenticatedRedeemRoute
+  '/wallet': typeof AuthenticatedWalletRoute
   '/dadaz/$id': typeof DadazIdRoute
 }
 export interface FileRoutesById {
@@ -85,6 +101,8 @@ export interface FileRoutesById {
   '/groups': typeof GroupsRoute
   '/utamu': typeof UtamuRoute
   '/_authenticated/profile': typeof AuthenticatedProfileRoute
+  '/_authenticated/redeem': typeof AuthenticatedRedeemRoute
+  '/_authenticated/wallet': typeof AuthenticatedWalletRoute
   '/dadaz/$id': typeof DadazIdRoute
 }
 export interface FileRouteTypes {
@@ -96,6 +114,8 @@ export interface FileRouteTypes {
     | '/groups'
     | '/utamu'
     | '/profile'
+    | '/redeem'
+    | '/wallet'
     | '/dadaz/$id'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -105,6 +125,8 @@ export interface FileRouteTypes {
     | '/groups'
     | '/utamu'
     | '/profile'
+    | '/redeem'
+    | '/wallet'
     | '/dadaz/$id'
   id:
     | '__root__'
@@ -115,6 +137,8 @@ export interface FileRouteTypes {
     | '/groups'
     | '/utamu'
     | '/_authenticated/profile'
+    | '/_authenticated/redeem'
+    | '/_authenticated/wallet'
     | '/dadaz/$id'
   fileRoutesById: FileRoutesById
 }
@@ -178,6 +202,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DadazIdRouteImport
       parentRoute: typeof DadazRoute
     }
+    '/_authenticated/wallet': {
+      id: '/_authenticated/wallet'
+      path: '/wallet'
+      fullPath: '/wallet'
+      preLoaderRoute: typeof AuthenticatedWalletRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/redeem': {
+      id: '/_authenticated/redeem'
+      path: '/redeem'
+      fullPath: '/redeem'
+      preLoaderRoute: typeof AuthenticatedRedeemRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/profile': {
       id: '/_authenticated/profile'
       path: '/profile'
@@ -190,10 +228,14 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedProfileRoute: typeof AuthenticatedProfileRoute
+  AuthenticatedRedeemRoute: typeof AuthenticatedRedeemRoute
+  AuthenticatedWalletRoute: typeof AuthenticatedWalletRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedProfileRoute: AuthenticatedProfileRoute,
+  AuthenticatedRedeemRoute: AuthenticatedRedeemRoute,
+  AuthenticatedWalletRoute: AuthenticatedWalletRoute,
 }
 
 const AuthenticatedRouteRouteWithChildren =
@@ -220,13 +262,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

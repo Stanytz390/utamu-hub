@@ -14,6 +14,27 @@ export type Database = {
   }
   public: {
     Tables: {
+      app_settings: {
+        Row: {
+          key: string
+          updated_at: string
+          updated_by: string | null
+          value: Json
+        }
+        Insert: {
+          key: string
+          updated_at?: string
+          updated_by?: string | null
+          value: Json
+        }
+        Update: {
+          key?: string
+          updated_at?: string
+          updated_by?: string | null
+          value?: Json
+        }
+        Relationships: []
+      }
       categories: {
         Row: {
           created_at: string
@@ -37,6 +58,98 @@ export type Database = {
           sort_order?: number
         }
         Relationships: []
+      }
+      coin_transactions: {
+        Row: {
+          created_at: string
+          delta_sq: number
+          id: string
+          kind: Database["public"]["Enums"]["coin_txn_kind"]
+          note: string | null
+          ref_id: string | null
+          status: Database["public"]["Enums"]["coin_txn_status"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          delta_sq: number
+          id?: string
+          kind: Database["public"]["Enums"]["coin_txn_kind"]
+          note?: string | null
+          ref_id?: string | null
+          status?: Database["public"]["Enums"]["coin_txn_status"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          delta_sq?: number
+          id?: string
+          kind?: Database["public"]["Enums"]["coin_txn_kind"]
+          note?: string | null
+          ref_id?: string | null
+          status?: Database["public"]["Enums"]["coin_txn_status"]
+          user_id?: string
+        }
+        Relationships: []
+      }
+      coin_wallets: {
+        Row: {
+          balance_sq: number
+          created_at: string
+          total_earned_sq: number
+          total_spent_sq: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          balance_sq?: number
+          created_at?: string
+          total_earned_sq?: number
+          total_spent_sq?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          balance_sq?: number
+          created_at?: string
+          total_earned_sq?: number
+          total_spent_sq?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      dadaz_contact_unlocks: {
+        Row: {
+          cost_sq: number
+          created_at: string
+          dadaz_id: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          cost_sq: number
+          created_at?: string
+          dadaz_id: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          cost_sq?: number
+          created_at?: string
+          dadaz_id?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dadaz_contact_unlocks_dadaz_id_fkey"
+            columns: ["dadaz_id"]
+            isOneToOne: false
+            referencedRelation: "dadaz_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       dadaz_follows: {
         Row: {
@@ -124,12 +237,16 @@ export type Database = {
       }
       dadaz_profiles: {
         Row: {
+          approved_at: string | null
+          approved_by: string | null
           avatar_url: string | null
           bio: string | null
+          contact_reveal_cost_sq: number
           cover_url: string | null
           created_at: string
           followers_count: number
           id: string
+          is_admin_approved: boolean
           is_published: boolean
           likes_count: number
           location: string | null
@@ -144,12 +261,16 @@ export type Database = {
           whatsapp: string | null
         }
         Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
           avatar_url?: string | null
           bio?: string | null
+          contact_reveal_cost_sq?: number
           cover_url?: string | null
           created_at?: string
           followers_count?: number
           id?: string
+          is_admin_approved?: boolean
           is_published?: boolean
           likes_count?: number
           location?: string | null
@@ -164,12 +285,16 @@ export type Database = {
           whatsapp?: string | null
         }
         Update: {
+          approved_at?: string | null
+          approved_by?: string | null
           avatar_url?: string | null
           bio?: string | null
+          contact_reveal_cost_sq?: number
           cover_url?: string | null
           created_at?: string
           followers_count?: number
           id?: string
+          is_admin_approved?: boolean
           is_published?: boolean
           likes_count?: number
           location?: string | null
@@ -281,26 +406,77 @@ export type Database = {
         Row: {
           avatar_url: string | null
           created_at: string
+          email: string | null
+          full_name: string | null
           id: string
           phone: string | null
+          referral_code: string | null
+          referred_by: string | null
           updated_at: string
           username: string | null
         }
         Insert: {
           avatar_url?: string | null
           created_at?: string
+          email?: string | null
+          full_name?: string | null
           id: string
           phone?: string | null
+          referral_code?: string | null
+          referred_by?: string | null
           updated_at?: string
           username?: string | null
         }
         Update: {
           avatar_url?: string | null
           created_at?: string
+          email?: string | null
+          full_name?: string | null
           id?: string
           phone?: string | null
+          referral_code?: string | null
+          referred_by?: string | null
           updated_at?: string
           username?: string | null
+        }
+        Relationships: []
+      }
+      promo_banners: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          image_url: string
+          is_active: boolean
+          link_url: string | null
+          sort_order: number
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          image_url: string
+          is_active?: boolean
+          link_url?: string | null
+          sort_order?: number
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          image_url?: string
+          is_active?: boolean
+          link_url?: string | null
+          sort_order?: number
+          title?: string
+          updated_at?: string
         }
         Relationships: []
       }
@@ -343,6 +519,104 @@ export type Database = {
           },
         ]
       }
+      redeem_claims: {
+        Row: {
+          coins_sq: number
+          created_at: string
+          id: string
+          link_id: string
+          user_id: string
+        }
+        Insert: {
+          coins_sq: number
+          created_at?: string
+          id?: string
+          link_id: string
+          user_id: string
+        }
+        Update: {
+          coins_sq?: number
+          created_at?: string
+          id?: string
+          link_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "redeem_claims_link_id_fkey"
+            columns: ["link_id"]
+            isOneToOne: false
+            referencedRelation: "redeem_links"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      redeem_links: {
+        Row: {
+          code: string
+          coins_sq: number
+          created_at: string
+          created_by: string | null
+          expires_at: string | null
+          id: string
+          is_active: boolean
+          max_uses: number
+          note: string | null
+          uses_count: number
+        }
+        Insert: {
+          code: string
+          coins_sq: number
+          created_at?: string
+          created_by?: string | null
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean
+          max_uses?: number
+          note?: string | null
+          uses_count?: number
+        }
+        Update: {
+          code?: string
+          coins_sq?: number
+          created_at?: string
+          created_by?: string | null
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean
+          max_uses?: number
+          note?: string | null
+          uses_count?: number
+        }
+        Relationships: []
+      }
+      referrals: {
+        Row: {
+          created_at: string
+          id: string
+          invitee_id: string
+          inviter_id: string
+          rewarded_at: string | null
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          invitee_id: string
+          inviter_id: string
+          rewarded_at?: string | null
+          status?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          invitee_id?: string
+          inviter_id?: string
+          rewarded_at?: string | null
+          status?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -373,6 +647,7 @@ export type Database = {
           duration: string | null
           id: string
           is_published: boolean
+          price_sq: number
           price_tsh: number
           thumbnail_url: string | null
           title: string
@@ -389,6 +664,7 @@ export type Database = {
           duration?: string | null
           id?: string
           is_published?: boolean
+          price_sq?: number
           price_tsh?: number
           thumbnail_url?: string | null
           title: string
@@ -405,6 +681,7 @@ export type Database = {
           duration?: string | null
           id?: string
           is_published?: boolean
+          price_sq?: number
           price_tsh?: number
           thumbnail_url?: string | null
           title?: string
@@ -428,6 +705,24 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      claim_redeem_link: {
+        Args: { _code: string; _user_id: string }
+        Returns: {
+          coins_credited: number
+          message: string
+        }[]
+      }
+      credit_coins: {
+        Args: {
+          _amount: number
+          _kind: Database["public"]["Enums"]["coin_txn_kind"]
+          _note: string
+          _ref_id: string
+          _user_id: string
+        }
+        Returns: string
+      }
+      generate_referral_code: { Args: never; Returns: string }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -435,9 +730,28 @@ export type Database = {
         }
         Returns: boolean
       }
+      spend_coins: {
+        Args: {
+          _amount: number
+          _kind: Database["public"]["Enums"]["coin_txn_kind"]
+          _note: string
+          _ref_id: string
+          _user_id: string
+        }
+        Returns: string
+      }
     }
     Enums: {
       app_role: "admin" | "business" | "user"
+      coin_txn_kind:
+        | "topup"
+        | "purchase"
+        | "gift"
+        | "referral"
+        | "redeem"
+        | "refund"
+        | "admin_adjust"
+      coin_txn_status: "pending" | "success" | "failed"
       dadaz_status: "free" | "work" | "service"
       payment_network: "halopesa" | "mixx" | "mpesa" | "airtel"
       payment_status: "pending" | "success" | "failed" | "cancelled"
@@ -569,6 +883,16 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "business", "user"],
+      coin_txn_kind: [
+        "topup",
+        "purchase",
+        "gift",
+        "referral",
+        "redeem",
+        "refund",
+        "admin_adjust",
+      ],
+      coin_txn_status: ["pending", "success", "failed"],
       dadaz_status: ["free", "work", "service"],
       payment_network: ["halopesa", "mixx", "mpesa", "airtel"],
       payment_status: ["pending", "success", "failed", "cancelled"],

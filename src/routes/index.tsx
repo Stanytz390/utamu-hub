@@ -3,6 +3,8 @@ import { useState, useMemo } from "react";
 import { Search, Bell, Flame, X } from "lucide-react";
 import { videos, profiles, groups, type Category } from "@/lib/mock-data";
 import { VideoCard } from "@/components/VideoCard";
+import { PromoBanners } from "@/components/PromoBanners";
+import { CoinBadge } from "@/components/CoinBadge";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -75,6 +77,7 @@ function Home() {
             UTAMU PORI
           </h1>
           <div className="flex items-center gap-2">
+            <CoinBadge />
             <Link to="/auth" className="rounded-full bg-muted p-2 text-muted-foreground">
               <Bell size={18} />
             </Link>

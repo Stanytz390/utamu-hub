@@ -12,7 +12,7 @@ export type VideoItem = {
   title: string;
   description: string;
   thumbnail: string;
-  price: number; // TSH, 0 = free
+  price_sq: number; // SQ coins, 0 = free
   duration: string;
   views: string;
   creator: string;
@@ -51,7 +51,7 @@ export const videos: VideoItem[] = [
     title: "Utamu wa Mchana",
     description: "Video moto ya siku ya leo. Piga download uone.",
     thumbnail: videoThumb1,
-    price: 0,
+    price_sq: 0,
     duration: "0:42",
     views: "12.4K",
     creator: "@utamuking",
@@ -62,7 +62,7 @@ export const videos: VideoItem[] = [
     title: "Kimasomaso Nights",
     description: "Exclusive premium video — HD quality.",
     thumbnail: profile1,
-    price: 1000,
+    price_sq: 10,
     duration: "2:15",
     views: "45.1K",
     creator: "@zawadi",
@@ -73,7 +73,7 @@ export const videos: VideoItem[] = [
     title: "Dar Vibes",
     description: "Poa na sio ghali. Lipa mara moja tu.",
     thumbnail: profile3,
-    price: 500,
+    price_sq: 5,
     duration: "1:08",
     views: "8.9K",
     creator: "@dartown",
@@ -84,7 +84,7 @@ export const videos: VideoItem[] = [
     title: "Weekend Special",
     description: "Free video ya wiki. Enjoy!",
     thumbnail: profile2,
-    price: 0,
+    price_sq: 0,
     duration: "0:55",
     views: "22.7K",
     creator: "@weekend",
@@ -95,7 +95,7 @@ export const videos: VideoItem[] = [
     title: "Mama Mkubwa",
     description: "Content premium yenye viwango vya juu.",
     thumbnail: profile4,
-    price: 2000,
+    price_sq: 20,
     duration: "3:30",
     views: "67.3K",
     creator: "@mkubwa",

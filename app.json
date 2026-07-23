@@ -48,6 +48,11 @@
       "description": "SpeedaPesa API base URL (mfano https://api.speedapesa.com)",
       "value": "https://api.speedapesa.com",
       "required": false
+    },
+    "ADMIN_EMAIL": {
+      "description": "Email ya admin mkuu — user aliyesajili kwa email hii anapata role ya admin automatically",
+      "value": "hostingstany@gmail.com",
+      "required": true
     }
   },
   "formation": {

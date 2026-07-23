@@ -27,8 +27,8 @@ function Utamu() {
     if (f === "New") sorted.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
     if (f === "Old") sorted.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
     let out = sorted;
-    if (f === "Free") out = out.filter((v) => v.price === 0);
-    if (f === "Premium") out = out.filter((v) => v.price > 0);
+    if (f === "Free") out = out.filter((v) => v.price_sq === 0);
+    if (f === "Premium") out = out.filter((v) => v.price_sq > 0);
     const needle = q.trim().toLowerCase();
     if (needle) {
       out = out.filter(
