@@ -3,73 +3,37 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast, Toaster } from "sonner";
 
+// ============================================================
+// Route – checks admin role via user_roles
+// ============================================================
 export const Route = createFileRoute("/admin")({
+  beforeLoad: async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("Unauthorized – Please log in.");
+
+    // Check if user has admin role in user_roles
+    const { data: roleData, error } = await supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", user.id)
+      .eq("role", "admin")
+      .maybeSingle();
+
+    if (error || !roleData) {
+      throw new Error("Admin access required.");
+    }
+
+    return { user };
+  },
   component: AdminDashboard,
 });
 
+// ============================================================
+// Main Component
+// ============================================================
 function AdminDashboard() {
   const navigate = useNavigate();
-  const [authenticated, setAuthenticated] = useState(false);
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
   const [activeTab, setActiveTab] = useState("dashboard");
-
-  useEffect(() => {
-    const isAuth = localStorage.getItem("admin_authenticated") === "true";
-    setAuthenticated(isAuth);
-  }, []);
-
-  const handlePasswordSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (password === "STANY#MINES") {
-      localStorage.setItem("admin_authenticated", "true");
-      setAuthenticated(true);
-      setError("");
-    } else {
-      setError("Incorrect password.");
-    }
-  };
-
-  const signOut = () => {
-    localStorage.removeItem("admin_authenticated");
-    setAuthenticated(false);
-    navigate({ to: "/" });
-  };
-
-  if (!authenticated) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-muted/30 px-4">
-        <div className="max-w-sm w-full bg-card rounded-2xl shadow-xl border border-border p-5">
-          <div className="text-center mb-5">
-            <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-[image:var(--gradient-primary)] shadow-[var(--shadow-neon)]">
-              <i className="fas fa-lock text-xl text-primary-foreground"></i>
-            </div>
-            <h1 className="text-xl font-black bg-[image:var(--gradient-primary)] bg-clip-text text-transparent">
-              Admin Access
-            </h1>
-            <p className="text-xs text-muted-foreground mt-1">Enter password</p>
-          </div>
-          <form onSubmit={handlePasswordSubmit}>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
-              className="w-full rounded-xl border border-border bg-input px-4 py-2.5 text-sm outline-none focus:border-primary transition"
-              autoFocus
-            />
-            {error && <p className="text-xs text-destructive mt-2">{error}</p>}
-            <button
-              type="submit"
-              className="mt-3 w-full rounded-xl bg-primary py-2.5 font-bold text-sm text-primary-foreground shadow-[var(--shadow-neon)] hover:opacity-90 transition"
-            >
-              Unlock
-            </button>
-          </form>
-        </div>
-      </div>
-    );
-  }
 
   const tabs = [
     { id: "dashboard", label: "Dashboard", icon: "fa-chart-line" },
@@ -83,13 +47,19 @@ function AdminDashboard() {
     { id: "settings", label: "Settings", icon: "fa-cog" },
   ];
 
+  const signOut = async () => {
+    await supabase.auth.signOut();
+    navigate({ to: "/auth" });
+  };
+
   return (
     <div className="flex min-h-screen bg-muted/30">
       <Toaster position="top-right" richColors />
+      {/* Sidebar */}
       <aside className="w-56 bg-card border-r border-border shadow-sm flex flex-col fixed inset-y-0 left-0 z-50 transform -translate-x-full md:translate-x-0 transition-transform duration-200 ease-in-out md:relative md:flex">
         <div className="p-4 border-b border-border bg-[image:var(--gradient-primary)] text-primary-foreground">
           <h1 className="text-base font-black">Admin</h1>
-          <p className="text-[10px] opacity-80 mt-0.5">Welcome back</p>
+          <p className="text-[10px] opacity-80 mt-0.5">UTAMU PORI</p>
         </div>
         <nav className="flex-1 overflow-y-auto p-2 space-y-0.5">
           {tabs.map((tab) => (
@@ -117,6 +87,7 @@ function AdminDashboard() {
         </div>
       </aside>
 
+      {/* Mobile header */}
       <div className="md:hidden fixed top-0 left-0 right-0 z-40 bg-card border-b border-border p-3 flex items-center justify-between">
         <button
           onClick={() => {
@@ -133,6 +104,7 @@ function AdminDashboard() {
         </button>
       </div>
 
+      {/* Main content */}
       <main className="flex-1 p-3 md:p-5 overflow-y-auto mt-14 md:mt-0">
         {activeTab === "dashboard" && <DashboardContent />}
         {activeTab === "users" && <UsersContent />}
@@ -148,22 +120,22 @@ function AdminDashboard() {
   );
 }
 
-// ==================== DASHBOARD ====================
+// ============================================================
+// DASHBOARD
+// ============================================================
 function DashboardContent() {
-  const [stats, setStats] = useState({ users: 0, videos: 0, groups: 0, coins: 0 });
+  const [stats, setStats] = useState({ users: 0, videos: 0, groups: 0 });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchStats = async () => {
       setLoading(true);
-      const [{ count: users }, { count: videos }, { count: groups }, { data: wallets }] = await Promise.all([
+      const [{ count: users }, { count: videos }, { count: groups }] = await Promise.all([
         supabase.from("profiles").select("*", { count: "exact", head: true }),
         supabase.from("videos").select("*", { count: "exact", head: true }),
         supabase.from("groups").select("*", { count: "exact", head: true }),
-        supabase.from("coin_wallets").select("balance_sq"),
       ]);
-      const totalCoins = wallets?.reduce((acc, w) => acc + (w.balance_sq || 0), 0) || 0;
-      setStats({ users: users || 0, videos: videos || 0, groups: groups || 0, coins: totalCoins });
+      setStats({ users: users || 0, videos: videos || 0, groups: groups || 0 });
       setLoading(false);
     };
     fetchStats();
@@ -175,22 +147,22 @@ function DashboardContent() {
     <div>
       <h2 className="text-lg font-bold mb-4">Dashboard</h2>
       <div className="grid grid-cols-2 gap-2">
-        <SmallStatCard title="Users" value={stats.users} icon="fa-users" color="blue" />
-        <SmallStatCard title="Videos" value={stats.videos} icon="fa-video" color="purple" />
-        <SmallStatCard title="Groups" value={stats.groups} icon="fa-users-cog" color="green" />
-        <SmallStatCard title="Coins" value={stats.coins} icon="fa-coins" color="gold" />
+        <StatCard title="Users" value={stats.users} icon="fa-users" color="blue" />
+        <StatCard title="Videos" value={stats.videos} icon="fa-video" color="purple" />
+        <StatCard title="Groups" value={stats.groups} icon="fa-users-cog" color="green" />
+        <StatCard title="Active" value="✓" icon="fa-check-circle" color="gold" />
       </div>
       <div className="mt-3 bg-card p-3 rounded-xl border border-border">
         <p className="text-xs text-muted-foreground">
           <i className="fas fa-info-circle mr-1"></i>
-          To add data, go to the respective tab and click the <strong className="text-primary">Add</strong> button.
+          Add data via the tabs above. Click <strong className="text-primary">Add</strong> to create new records.
         </p>
       </div>
     </div>
   );
 }
 
-function SmallStatCard({ title, value, icon, color }) {
+function StatCard({ title, value, icon, color }) {
   const colors = {
     blue: "bg-blue-50 text-blue-600",
     purple: "bg-purple-50 text-purple-600",
@@ -208,28 +180,27 @@ function SmallStatCard({ title, value, icon, color }) {
   );
 }
 
-// ==================== USERS ====================
+// ============================================================
+// USERS
+// ============================================================
 function UsersContent() {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const fetchUsers = async () => {
     setLoading(true);
-    const { data } = await supabase.from("profiles").select("*").order("created_at", { ascending: false });
+    const { data } = await supabase
+      .from("profiles")
+      .select("id, username, phone, avatar_url, created_at")
+      .order("created_at", { ascending: false });
     setUsers(data || []);
     setLoading(false);
   };
 
   useEffect(() => { fetchUsers(); }, []);
 
-  const updateRole = async (id, role) => {
-    await supabase.from("profiles").update({ role }).eq("id", id);
-    fetchUsers();
-    toast.success("Role updated");
-  };
-
   const deleteUser = async (id) => {
-    if (!confirm("Delete this user permanently?")) return;
+    if (!confirm("Delete this user?")) return;
     await supabase.from("profiles").delete().eq("id", id);
     fetchUsers();
     toast.success("User deleted");
@@ -239,37 +210,24 @@ function UsersContent() {
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-3">
-        <h2 className="text-lg font-bold">Users</h2>
-        <span className="text-xs text-muted-foreground">{users.length}</span>
-      </div>
+      <h2 className="text-lg font-bold mb-3">Users</h2>
       <div className="bg-card rounded-xl shadow-sm border border-border overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
             <thead className="bg-muted/50">
               <tr>
-                <th className="px-2 py-2 text-left font-medium">Name</th>
-                <th className="px-2 py-2 text-left font-medium hidden sm:table-cell">Email</th>
-                <th className="px-2 py-2 text-left font-medium">Role</th>
+                <th className="px-2 py-2 text-left font-medium">Username</th>
+                <th className="px-2 py-2 text-left font-medium hidden sm:table-cell">Phone</th>
+                <th className="px-2 py-2 text-left font-medium">Joined</th>
                 <th className="px-2 py-2 text-left font-medium">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
               {users.map((u) => (
                 <tr key={u.id} className="hover:bg-muted/30">
-                  <td className="px-2 py-2">{u.full_name || u.username || "—"}</td>
-                  <td className="px-2 py-2 hidden sm:table-cell">{u.email}</td>
-                  <td className="px-2 py-2">
-                    <select
-                      value={u.role || "user"}
-                      onChange={(e) => updateRole(u.id, e.target.value)}
-                      className="border border-border rounded-lg px-1 py-0.5 text-[10px] focus:ring-1 focus:ring-primary outline-none"
-                    >
-                      <option value="user">User</option>
-                      <option value="business">Business</option>
-                      <option value="admin">Admin</option>
-                    </select>
-                  </td>
+                  <td className="px-2 py-2">{u.username || "—"}</td>
+                  <td className="px-2 py-2 hidden sm:table-cell">{u.phone || "—"}</td>
+                  <td className="px-2 py-2">{new Date(u.created_at).toLocaleDateString()}</td>
                   <td className="px-2 py-2">
                     <button onClick={() => deleteUser(u.id)} className="text-destructive/70 hover:text-destructive">
                       <i className="fas fa-trash-alt text-xs"></i>
@@ -285,7 +243,9 @@ function UsersContent() {
   );
 }
 
-// ==================== VIDEOS ====================
+// ============================================================
+// VIDEOS
+// ============================================================
 function VideosContent() {
   const [videos, setVideos] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -294,24 +254,28 @@ function VideosContent() {
   const [form, setForm] = useState({
     title: "",
     description: "",
-    category: "",
-    price_sq: 0,
-    status: "pending",
-    videoFile: null,
-    thumbnailFile: null,
+    video_url: "",
+    thumbnail_url: "",
+    price_tsh: 0,
+    is_published: true,
+    category_slug: "",
+    creator: "",
+    duration: "",
   });
-  const [uploading, setUploading] = useState(false);
   const [categories, setCategories] = useState([]);
 
   const fetchVideos = async () => {
     setLoading(true);
-    const { data } = await supabase.from("videos").select("*, profiles(full_name)").order("created_at", { ascending: false });
+    const { data } = await supabase
+      .from("videos")
+      .select("*, categories!video_category_id_fkey (slug, label)")
+      .order("created_at", { ascending: false });
     setVideos(data || []);
     setLoading(false);
   };
 
   const fetchCategories = async () => {
-    const { data } = await supabase.from("categories").select("*");
+    const { data } = await supabase.from("categories").select("slug, label").order("sort_order");
     setCategories(data || []);
   };
 
@@ -319,42 +283,16 @@ function VideosContent() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setUploading(true);
-
-    let videoUrl = form.video_url || "";
-    let thumbUrl = form.thumbnail || "";
-
-    if (form.videoFile) {
-      const file = form.videoFile;
-      const filePath = `videos/${Date.now()}_${file.name}`;
-      const { error } = await supabase.storage.from("utamu_videos").upload(filePath, file);
-      if (error) {
-        toast.error("Video upload failed: " + error.message);
-        setUploading(false);
-        return;
-      }
-      const { data: urlData } = supabase.storage.from("utamu_videos").getPublicUrl(filePath);
-      videoUrl = urlData.publicUrl;
-    }
-
-    if (form.thumbnailFile) {
-      const file = form.thumbnailFile;
-      const filePath = `thumbnails/${Date.now()}_${file.name}`;
-      const { error } = await supabase.storage.from("utamu_thumbnails").upload(filePath, file);
-      if (!error) {
-        const { data: urlData } = supabase.storage.from("utamu_thumbnails").getPublicUrl(filePath);
-        thumbUrl = urlData.publicUrl;
-      }
-    }
-
     const payload = {
       title: form.title,
       description: form.description,
-      video_url: videoUrl,
-      thumbnail: thumbUrl,
-      price_sq: Number(form.price_sq),
-      status: form.status,
-      category: form.category || null,
+      video_url: form.video_url,
+      thumbnail_url: form.thumbnail_url,
+      price_tsh: Number(form.price_tsh),
+      is_published: form.is_published,
+      category_slug: form.category_slug || null,
+      creator: form.creator || null,
+      duration: form.duration || null,
     };
 
     if (editing) {
@@ -362,16 +300,15 @@ function VideosContent() {
       toast.success("Video updated");
     } else {
       const { data: { user } } = await supabase.auth.getUser();
-      if (user) payload.creator_id = user.id;
+      if (user) payload.uploaded_by = user.id;
       await supabase.from("videos").insert(payload);
       toast.success("Video created");
     }
 
     setShowForm(false);
     setEditing(null);
-    setForm({ title: "", description: "", category: "", price_sq: 0, status: "pending", videoFile: null, thumbnailFile: null });
+    setForm({ title: "", description: "", video_url: "", thumbnail_url: "", price_tsh: 0, is_published: true, category_slug: "", creator: "", duration: "" });
     fetchVideos();
-    setUploading(false);
   };
 
   const deleteVideo = async (id) => {
@@ -381,11 +318,10 @@ function VideosContent() {
     toast.success("Video deleted");
   };
 
-  const toggleStatus = async (id, current) => {
-    const newStatus = current === "available" ? "pending" : "available";
-    await supabase.from("videos").update({ status: newStatus }).eq("id", id);
+  const togglePublish = async (id, current) => {
+    await supabase.from("videos").update({ is_published: !current }).eq("id", id);
     fetchVideos();
-    toast.success(`Status: ${newStatus}`);
+    toast.success(`Video ${!current ? "published" : "unpublished"}`);
   };
 
   if (loading) return <Loading />;
@@ -395,7 +331,7 @@ function VideosContent() {
       <div className="flex justify-between items-center mb-3">
         <h2 className="text-lg font-bold">Videos</h2>
         <button
-          onClick={() => { setShowForm(true); setEditing(null); setForm({ title: "", description: "", category: "", price_sq: 0, status: "pending", videoFile: null, thumbnailFile: null }); }}
+          onClick={() => { setShowForm(true); setEditing(null); setForm({ title: "", description: "", video_url: "", thumbnail_url: "", price_tsh: 0, is_published: true, category_slug: "", creator: "", duration: "" }); }}
           className="bg-primary text-primary-foreground px-3 py-1.5 rounded-lg font-semibold shadow-[var(--shadow-neon)] hover:opacity-90 transition flex items-center gap-1 text-xs"
         >
           <i className="fas fa-plus text-xs"></i> Add
@@ -410,7 +346,7 @@ function VideosContent() {
                 value={form.title}
                 onChange={(e) => setForm({ ...form, title: e.target.value })}
                 placeholder="Title"
-                className="border border-border rounded-lg px-3 py-1.5 bg-input text-xs focus:ring-1 focus:ring-primary outline-none"
+                className="border border-border rounded-lg px-3 py-1.5 bg-input text-xs"
                 required
               />
               <textarea
@@ -418,61 +354,68 @@ function VideosContent() {
                 onChange={(e) => setForm({ ...form, description: e.target.value })}
                 placeholder="Description"
                 rows={2}
-                className="border border-border rounded-lg px-3 py-1.5 bg-input text-xs focus:ring-1 focus:ring-primary outline-none"
+                className="border border-border rounded-lg px-3 py-1.5 bg-input text-xs"
+              />
+              <input
+                value={form.video_url}
+                onChange={(e) => setForm({ ...form, video_url: e.target.value })}
+                placeholder="Video URL"
+                className="border border-border rounded-lg px-3 py-1.5 bg-input text-xs"
+                required
+              />
+              <input
+                value={form.thumbnail_url}
+                onChange={(e) => setForm({ ...form, thumbnail_url: e.target.value })}
+                placeholder="Thumbnail URL"
+                className="border border-border rounded-lg px-3 py-1.5 bg-input text-xs"
               />
               <div className="grid grid-cols-2 gap-2">
-                <select
-                  value={form.category}
-                  onChange={(e) => setForm({ ...form, category: e.target.value })}
-                  className="border border-border rounded-lg px-2 py-1.5 bg-input text-xs"
-                >
-                  <option value="">Category</option>
-                  {categories.map((c) => <option key={c.id} value={c.name}>{c.name}</option>)}
-                </select>
                 <input
                   type="number"
-                  value={form.price_sq}
-                  onChange={(e) => setForm({ ...form, price_sq: Number(e.target.value) })}
-                  placeholder="Price SQ"
+                  value={form.price_tsh}
+                  onChange={(e) => setForm({ ...form, price_tsh: Number(e.target.value) })}
+                  placeholder="Price (TSh)"
+                  className="border border-border rounded-lg px-2 py-1.5 bg-input text-xs"
+                />
+                <input
+                  value={form.duration}
+                  onChange={(e) => setForm({ ...form, duration: e.target.value })}
+                  placeholder="Duration (e.g. 3:45)"
+                  className="border border-border rounded-lg px-2 py-1.5 bg-input text-xs"
+                />
+                <input
+                  value={form.creator}
+                  onChange={(e) => setForm({ ...form, creator: e.target.value })}
+                  placeholder="Creator name"
                   className="border border-border rounded-lg px-2 py-1.5 bg-input text-xs"
                 />
                 <select
-                  value={form.status}
-                  onChange={(e) => setForm({ ...form, status: e.target.value })}
-                  className="border border-border rounded-lg px-2 py-1.5 bg-input text-xs col-span-2"
+                  value={form.category_slug}
+                  onChange={(e) => setForm({ ...form, category_slug: e.target.value })}
+                  className="border border-border rounded-lg px-2 py-1.5 bg-input text-xs"
                 >
-                  <option value="pending">Pending</option>
-                  <option value="available">Available</option>
+                  <option value="">No category</option>
+                  {categories.map((c) => (
+                    <option key={c.slug} value={c.slug}>{c.label}</option>
+                  ))}
                 </select>
               </div>
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block text-[10px] text-muted-foreground">Video File</label>
-                  <input
-                    type="file"
-                    accept="video/*"
-                    onChange={(e) => setForm({ ...form, videoFile: e.target.files?.[0] || null })}
-                    className="w-full border border-border rounded-lg px-2 py-1 bg-input text-xs file:mr-1 file:py-0.5 file:px-2 file:rounded-full file:border-0 file:text-[10px] file:bg-primary file:text-primary-foreground"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[10px] text-muted-foreground">Thumbnail</label>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => setForm({ ...form, thumbnailFile: e.target.files?.[0] || null })}
-                    className="w-full border border-border rounded-lg px-2 py-1 bg-input text-xs file:mr-1 file:py-0.5 file:px-2 file:rounded-full file:border-0 file:text-[10px] file:bg-primary file:text-primary-foreground"
-                  />
-                </div>
+              <div className="flex items-center gap-2">
+                <label className="text-xs text-muted-foreground">Published:</label>
+                <input
+                  type="checkbox"
+                  checked={form.is_published}
+                  onChange={(e) => setForm({ ...form, is_published: e.target.checked })}
+                  className="rounded border-border"
+                />
               </div>
             </div>
             <div className="flex gap-2">
               <button
                 type="submit"
-                disabled={uploading}
                 className="bg-primary text-primary-foreground px-4 py-1.5 rounded-lg font-semibold text-xs shadow-[var(--shadow-neon)] hover:opacity-90 transition"
               >
-                {uploading ? <i className="fas fa-spinner fa-spin"></i> : (editing ? "Update" : "Save")}
+                {editing ? "Update" : "Save"}
               </button>
               <button
                 type="button"
@@ -502,23 +445,33 @@ function VideosContent() {
               {videos.map((v) => (
                 <tr key={v.id} className="hover:bg-muted/30">
                   <td className="px-2 py-2 max-w-[80px] truncate">{v.title}</td>
-                  <td className="px-2 py-2 hidden sm:table-cell">{v.category || "—"}</td>
-                  <td className="px-2 py-2">{v.price_sq}</td>
+                  <td className="px-2 py-2 hidden sm:table-cell">{v.categories?.label || "—"}</td>
+                  <td className="px-2 py-2">TSh {v.price_tsh}</td>
                   <td className="px-2 py-2">
                     <button
-                      onClick={() => toggleStatus(v.id, v.status)}
+                      onClick={() => togglePublish(v.id, v.is_published)}
                       className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
-                        v.status === "available" ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"
+                        v.is_published ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"
                       }`}
                     >
-                      {v.status === "available" ? "✓" : "⏳"}
+                      {v.is_published ? "✓" : "⏳"}
                     </button>
                   </td>
                   <td className="px-2 py-2 flex gap-1">
                     <button
                       onClick={() => {
                         setEditing(v);
-                        setForm({ ...v, videoFile: null, thumbnailFile: null });
+                        setForm({
+                          title: v.title,
+                          description: v.description || "",
+                          video_url: v.video_url,
+                          thumbnail_url: v.thumbnail_url || "",
+                          price_tsh: v.price_tsh,
+                          is_published: v.is_published,
+                          category_slug: v.category_slug || "",
+                          creator: v.creator || "",
+                          duration: v.duration || "",
+                        });
                         setShowForm(true);
                       }}
                       className="text-primary hover:opacity-80"
@@ -539,29 +492,33 @@ function VideosContent() {
   );
 }
 
-// ==================== CATEGORIES ====================
+// ============================================================
+// CATEGORIES
+// ============================================================
 function CategoriesContent() {
   const [categories, setCategories] = useState([]);
-  const [newName, setNewName] = useState("");
+  const [newSlug, setNewSlug] = useState("");
+  const [newLabel, setNewLabel] = useState("");
   const [editing, setEditing] = useState(null);
+  const [editLabel, setEditLabel] = useState("");
 
   const fetchCategories = async () => {
-    const { data } = await supabase.from("categories").select("*").order("name");
+    const { data } = await supabase.from("categories").select("*").order("sort_order");
     setCategories(data || []);
   };
 
   useEffect(() => { fetchCategories(); }, []);
 
   const addCategory = async () => {
-    if (!newName.trim()) return;
-    await supabase.from("categories").insert({ name: newName.trim() });
-    setNewName("");
+    if (!newSlug.trim() || !newLabel.trim()) return toast.error("Slug and label required");
+    await supabase.from("categories").insert({ slug: newSlug.trim(), label: newLabel.trim() });
+    setNewSlug(""); setNewLabel("");
     fetchCategories();
     toast.success("Category added");
   };
 
-  const updateCategory = async (id, name) => {
-    await supabase.from("categories").update({ name }).eq("id", id);
+  const updateCategory = async (id, label) => {
+    await supabase.from("categories").update({ label }).eq("id", id);
     setEditing(null);
     fetchCategories();
     toast.success("Updated");
@@ -577,12 +534,18 @@ function CategoriesContent() {
   return (
     <div>
       <h2 className="text-lg font-bold mb-3">Categories</h2>
-      <div className="flex gap-2 mb-3">
+      <div className="flex flex-wrap gap-2 mb-3">
         <input
-          value={newName}
-          onChange={(e) => setNewName(e.target.value)}
-          placeholder="New category"
-          className="flex-1 border border-border rounded-lg px-3 py-1.5 bg-input text-xs focus:ring-1 focus:ring-primary outline-none"
+          value={newSlug}
+          onChange={(e) => setNewSlug(e.target.value)}
+          placeholder="Slug (e.g. music)"
+          className="flex-1 border border-border rounded-lg px-3 py-1.5 bg-input text-xs min-w-[100px]"
+        />
+        <input
+          value={newLabel}
+          onChange={(e) => setNewLabel(e.target.value)}
+          placeholder="Label (e.g. Music)"
+          className="flex-1 border border-border rounded-lg px-3 py-1.5 bg-input text-xs min-w-[100px]"
         />
         <button onClick={addCategory} className="bg-primary text-primary-foreground px-3 py-1.5 rounded-lg font-semibold text-xs shadow-[var(--shadow-neon)] hover:opacity-90 transition">
           <i className="fas fa-plus"></i>
@@ -594,18 +557,19 @@ function CategoriesContent() {
             {editing === c.id ? (
               <div className="flex gap-2 flex-1">
                 <input
-                  defaultValue={c.name}
-                  onBlur={(e) => updateCategory(c.id, e.target.value)}
+                  value={editLabel}
+                  onChange={(e) => setEditLabel(e.target.value)}
                   className="flex-1 border border-border rounded-lg px-2 py-1 bg-input text-xs"
                   autoFocus
                 />
+                <button onClick={() => updateCategory(c.id, editLabel)} className="text-primary text-xs">Save</button>
                 <button onClick={() => setEditing(null)} className="text-muted-foreground text-xs">Cancel</button>
               </div>
             ) : (
               <>
-                <span className="text-sm">{c.name}</span>
+                <span className="text-sm">{c.label} <span className="text-muted-foreground text-[10px]">({c.slug})</span></span>
                 <div className="flex gap-2">
-                  <button onClick={() => setEditing(c.id)} className="text-primary">
+                  <button onClick={() => { setEditing(c.id); setEditLabel(c.label); }} className="text-primary">
                     <i className="fas fa-edit text-xs"></i>
                   </button>
                   <button onClick={() => deleteCategory(c.id)} className="text-destructive/70">
@@ -621,13 +585,15 @@ function CategoriesContent() {
   );
 }
 
-// ==================== GROUPS ====================
+// ============================================================
+// GROUPS
+// ============================================================
 function GroupsContent() {
   const [groups, setGroups] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
-  const [form, setForm] = useState({ name: "", description: "", logo_url: "", link: "", price_sq: 0 });
+  const [form, setForm] = useState({ name: "", description: "", logo_url: "", link: "", members: 0, category: "", is_published: true });
 
   const fetchGroups = async () => {
     setLoading(true);
@@ -640,7 +606,7 @@ function GroupsContent() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const payload = { ...form, price_sq: Number(form.price_sq) };
+    const payload = { ...form, members: Number(form.members) };
     if (editing) {
       await supabase.from("groups").update(payload).eq("id", editing.id);
       toast.success("Group updated");
@@ -650,9 +616,7 @@ function GroupsContent() {
       await supabase.from("groups").insert(payload);
       toast.success("Group created");
     }
-    setShowForm(false);
-    setEditing(null);
-    setForm({ name: "", description: "", logo_url: "", link: "", price_sq: 0 });
+    setShowForm(false); setEditing(null); setForm({ name: "", description: "", logo_url: "", link: "", members: 0, category: "", is_published: true });
     fetchGroups();
   };
 
@@ -669,10 +633,7 @@ function GroupsContent() {
     <div>
       <div className="flex justify-between items-center mb-3">
         <h2 className="text-lg font-bold">Groups</h2>
-        <button
-          onClick={() => { setShowForm(true); setEditing(null); setForm({ name: "", description: "", logo_url: "", link: "", price_sq: 0 }); }}
-          className="bg-primary text-primary-foreground px-3 py-1.5 rounded-lg font-semibold text-xs shadow-[var(--shadow-neon)] hover:opacity-90 transition flex items-center gap-1"
-        >
+        <button onClick={() => { setShowForm(true); setEditing(null); setForm({ name: "", description: "", logo_url: "", link: "", members: 0, category: "", is_published: true }); }} className="bg-primary text-primary-foreground px-3 py-1.5 rounded-lg font-semibold shadow-[var(--shadow-neon)] hover:opacity-90 transition flex items-center gap-1 text-xs">
           <i className="fas fa-plus"></i> Add
         </button>
       </div>
@@ -680,46 +641,21 @@ function GroupsContent() {
       {showForm && (
         <div className="bg-card p-3 rounded-xl shadow-sm border border-border mb-3">
           <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-2">
-            <input
-              value={form.name}
-              onChange={(e) => setForm({ ...form, name: e.target.value })}
-              placeholder="Name"
-              className="border border-border rounded-lg px-3 py-1.5 bg-input text-xs"
-              required
-            />
-            <input
-              value={form.description}
-              onChange={(e) => setForm({ ...form, description: e.target.value })}
-              placeholder="Description"
-              className="border border-border rounded-lg px-3 py-1.5 bg-input text-xs"
-            />
-            <input
-              value={form.logo_url}
-              onChange={(e) => setForm({ ...form, logo_url: e.target.value })}
-              placeholder="Logo URL"
-              className="border border-border rounded-lg px-3 py-1.5 bg-input text-xs"
-            />
-            <input
-              value={form.link}
-              onChange={(e) => setForm({ ...form, link: e.target.value })}
-              placeholder="Group Link"
-              className="border border-border rounded-lg px-3 py-1.5 bg-input text-xs"
-              required
-            />
-            <input
-              type="number"
-              value={form.price_sq}
-              onChange={(e) => setForm({ ...form, price_sq: Number(e.target.value) })}
-              placeholder="Price SQ (0=free)"
-              className="border border-border rounded-lg px-3 py-1.5 bg-input text-xs"
-            />
+            <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Name" className="border border-border rounded-lg px-3 py-1.5 bg-input text-xs" required />
+            <input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Description" className="border border-border rounded-lg px-3 py-1.5 bg-input text-xs" />
+            <input value={form.logo_url} onChange={(e) => setForm({ ...form, logo_url: e.target.value })} placeholder="Logo URL" className="border border-border rounded-lg px-3 py-1.5 bg-input text-xs" />
+            <input value={form.link} onChange={(e) => setForm({ ...form, link: e.target.value })} placeholder="Link" className="border border-border rounded-lg px-3 py-1.5 bg-input text-xs" required />
+            <div className="grid grid-cols-2 gap-2">
+              <input type="number" value={form.members} onChange={(e) => setForm({ ...form, members: Number(e.target.value) })} placeholder="Members" className="border border-border rounded-lg px-2 py-1.5 bg-input text-xs" />
+              <input value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} placeholder="Category" className="border border-border rounded-lg px-2 py-1.5 bg-input text-xs" />
+            </div>
+            <div className="flex items-center gap-2">
+              <label className="text-xs text-muted-foreground">Published:</label>
+              <input type="checkbox" checked={form.is_published} onChange={(e) => setForm({ ...form, is_published: e.target.checked })} className="rounded border-border" />
+            </div>
             <div className="flex gap-2">
-              <button type="submit" className="bg-primary text-primary-foreground px-4 py-1.5 rounded-lg font-semibold text-xs shadow-[var(--shadow-neon)] hover:opacity-90 transition">
-                {editing ? "Update" : "Save"}
-              </button>
-              <button type="button" onClick={() => setShowForm(false)} className="border border-border px-4 py-1.5 rounded-lg text-xs hover:bg-muted transition">
-                Cancel
-              </button>
+              <button type="submit" className="bg-primary text-primary-foreground px-4 py-1.5 rounded-lg font-semibold text-xs shadow-[var(--shadow-neon)] hover:opacity-90 transition">{editing ? "Update" : "Save"}</button>
+              <button type="button" onClick={() => setShowForm(false)} className="border border-border px-4 py-1.5 rounded-lg text-xs hover:bg-muted transition">Cancel</button>
             </div>
           </form>
         </div>
@@ -729,28 +665,21 @@ function GroupsContent() {
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
             <thead className="bg-muted/50">
-              <tr>
-                <th className="px-2 py-2 text-left font-medium">Name</th>
-                <th className="px-2 py-2 text-left font-medium">Price</th>
-                <th className="px-2 py-2 text-left font-medium hidden sm:table-cell">Link</th>
-                <th className="px-2 py-2 text-left font-medium">Actions</th>
-              </tr>
+              <tr><th className="px-2 py-2 text-left font-medium">Name</th><th className="px-2 py-2 text-left font-medium hidden sm:table-cell">Members</th><th className="px-2 py-2 text-left font-medium">Status</th><th className="px-2 py-2 text-left font-medium">Actions</th></tr>
             </thead>
             <tbody className="divide-y divide-border">
               {groups.map((g) => (
                 <tr key={g.id} className="hover:bg-muted/30">
                   <td className="px-2 py-2">{g.name}</td>
-                  <td className="px-2 py-2">{g.price_sq === 0 ? "Free" : `${g.price_sq} SQ`}</td>
-                  <td className="px-2 py-2 hidden sm:table-cell">
-                    <a href={g.link} target="_blank" rel="noreferrer" className="text-primary hover:underline text-[10px]">Link</a>
+                  <td className="px-2 py-2 hidden sm:table-cell">{g.members}</td>
+                  <td className="px-2 py-2">
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${g.is_published ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"}`}>
+                      {g.is_published ? "✓" : "⏳"}
+                    </span>
                   </td>
                   <td className="px-2 py-2 flex gap-1">
-                    <button onClick={() => { setEditing(g); setForm(g); setShowForm(true); }} className="text-primary">
-                      <i className="fas fa-edit text-xs"></i>
-                    </button>
-                    <button onClick={() => deleteGroup(g.id)} className="text-destructive/70">
-                      <i className="fas fa-trash-alt text-xs"></i>
-                    </button>
+                    <button onClick={() => { setEditing(g); setForm(g); setShowForm(true); }} className="text-primary"><i className="fas fa-edit text-xs"></i></button>
+                    <button onClick={() => deleteGroup(g.id)} className="text-destructive/70"><i className="fas fa-trash-alt text-xs"></i></button>
                   </td>
                 </tr>
               ))}
@@ -762,33 +691,34 @@ function GroupsContent() {
   );
 }
 
-// ==================== BUSINESS ====================
+// ============================================================
+// BUSINESS (Dadaz) – using dadaz_profiles table
+// ============================================================
 function BusinessContent() {
   const [businesses, setBusinesses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(null);
   const [showEditModal, setShowEditModal] = useState(false);
   const [form, setForm] = useState({
+    username: "",
+    location: "",
+    status: "free",
+    bio: "",
+    services: "",
+    price_tsh: 0,
+    price_label: "",
     whatsapp: "",
     phone: "",
-    location: "",
-    services: "",
-    contact_price: 0,
-    service_prices: "{}",
-    is_confirmed: false,
-    is_approved: true,
+    avatar_url: "",
+    cover_url: "",
+    is_published: false,
   });
 
   const fetchBusinesses = async () => {
     setLoading(true);
     const { data } = await supabase
-      .from("profiles")
-      .select(`
-        id, full_name, email, username, phone, avatar_url, location, bio, status, is_approved, role,
-        business_contacts ( id, whatsapp, phone, location, services, contact_price, service_prices, is_confirmed ),
-        coin_wallets ( balance_sq )
-      `)
-      .eq("role", "business")
+      .from("dadaz_profiles")
+      .select("*, profiles!dadaz_profiles_owner_id_fkey (username)")
       .order("created_at", { ascending: false });
     setBusinesses(data || []);
     setLoading(false);
@@ -797,17 +727,20 @@ function BusinessContent() {
   useEffect(() => { fetchBusinesses(); }, []);
 
   const openEditModal = (biz) => {
-    const contact = biz.business_contacts?.[0] || {};
     setEditing(biz);
     setForm({
-      whatsapp: contact.whatsapp || "",
-      phone: contact.phone || biz.phone || "",
-      location: contact.location || biz.location || "",
-      services: contact.services || "",
-      contact_price: contact.contact_price || 0,
-      service_prices: contact.service_prices ? JSON.stringify(contact.service_prices, null, 2) : "{}",
-      is_confirmed: contact.is_confirmed || false,
-      is_approved: biz.is_approved !== undefined ? biz.is_approved : true,
+      username: biz.username,
+      location: biz.location || "",
+      status: biz.status || "free",
+      bio: biz.bio || "",
+      services: biz.services || "",
+      price_tsh: biz.price_tsh || 0,
+      price_label: biz.price_label || "",
+      whatsapp: biz.whatsapp || "",
+      phone: biz.phone || "",
+      avatar_url: biz.avatar_url || "",
+      cover_url: biz.cover_url || "",
+      is_published: biz.is_published || false,
     });
     setShowEditModal(true);
   };
@@ -819,101 +752,79 @@ function BusinessContent() {
     if (!editing) return;
     setLoading(true);
 
-    await supabase
-      .from("profiles")
-      .update({ is_approved: form.is_approved, phone: form.phone, location: form.location })
-      .eq("id", editing.id);
-
-    const contact = editing.business_contacts?.[0];
     const payload = {
-      business_id: editing.id,
+      username: form.username,
+      location: form.location,
+      status: form.status,
+      bio: form.bio,
+      services: form.services,
+      price_tsh: Number(form.price_tsh),
+      price_label: form.price_label,
       whatsapp: form.whatsapp,
       phone: form.phone,
-      location: form.location,
-      services: form.services,
-      contact_price: Number(form.contact_price),
-      service_prices: form.service_prices ? JSON.parse(form.service_prices) : {},
-      is_confirmed: form.is_confirmed,
+      avatar_url: form.avatar_url,
+      cover_url: form.cover_url,
+      is_published: form.is_published,
     };
 
-    if (contact) {
-      await supabase.from("business_contacts").update(payload).eq("id", contact.id);
-    } else {
-      await supabase.from("business_contacts").insert(payload);
-    }
-
+    await supabase.from("dadaz_profiles").update(payload).eq("id", editing.id);
     toast.success("Business updated");
     closeEditModal();
     fetchBusinesses();
   };
 
-  const toggleApproval = async (id, current) => {
-    await supabase.from("profiles").update({ is_approved: !current }).eq("id", id);
+  const togglePublish = async (id, current) => {
+    await supabase.from("dadaz_profiles").update({ is_published: !current }).eq("id", id);
     fetchBusinesses();
-    toast.success(`Business ${!current ? "approved" : "deactivated"}`);
+    toast.success(`Business ${!current ? "published" : "unpublished"}`);
   };
 
-  const deleteBusinessContact = async (id) => {
-    if (!confirm("Delete this business contact?")) return;
-    await supabase.from("business_contacts").delete().eq("business_id", id);
-    fetchBusinesses();
-    toast.success("Deleted");
-  };
-
-  if (loading && !showEditModal) return <Loading />;
+  if (loading) return <Loading />;
 
   return (
     <div>
       <div className="flex justify-between items-center mb-3">
-        <h2 className="text-lg font-bold">Business</h2>
-        <span className="text-xs text-muted-foreground">{businesses.length}</span>
+        <h2 className="text-lg font-bold">Business (Dadaz)</h2>
+        <span className="text-xs text-muted-foreground">{businesses.length} total</span>
       </div>
-
       <div className="bg-card rounded-xl shadow-sm border border-border overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
             <thead className="bg-muted/50">
               <tr>
-                <th className="px-2 py-2 text-left font-medium">Name</th>
-                <th className="px-2 py-2 text-left font-medium hidden sm:table-cell">Email</th>
+                <th className="px-2 py-2 text-left font-medium">Username</th>
+                <th className="px-2 py-2 text-left font-medium hidden sm:table-cell">Location</th>
                 <th className="px-2 py-2 text-left font-medium">Status</th>
-                <th className="px-2 py-2 text-left font-medium">Balance</th>
+                <th className="px-2 py-2 text-left font-medium">Published</th>
                 <th className="px-2 py-2 text-left font-medium">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {businesses.map((b) => {
-                const contact = b.business_contacts?.[0];
-                return (
-                  <tr key={b.id} className="hover:bg-muted/30">
-                    <td className="px-2 py-2 flex items-center gap-1">
-                      <img
-                        src={b.avatar_url || "/default-avatar.png"}
-                        alt={b.full_name}
-                        className="w-5 h-5 rounded-full object-cover"
-                      />
-                      <span className="truncate max-w-[60px]">{b.full_name || b.username || "—"}</span>
-                    </td>
-                    <td className="px-2 py-2 hidden sm:table-cell">{b.email}</td>
-                    <td className="px-2 py-2">
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${b.is_approved !== false ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
-                        {b.is_approved !== false ? "✓" : "✗"}
-                      </span>
-                    </td>
-                    <td className="px-2 py-2 font-semibold">{b.coin_wallets?.[0]?.balance_sq || 0}</td>
-                    <td className="px-2 py-2 flex gap-1">
-                      <button onClick={() => openEditModal(b)} className="text-primary">
-                        <i className="fas fa-edit text-xs"></i>
-                      </button>
-                      {contact && (
-                        <button onClick={() => deleteBusinessContact(b.id)} className="text-destructive/70">
-                          <i className="fas fa-trash-alt text-xs"></i>
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
+              {businesses.map((b) => (
+                <tr key={b.id} className="hover:bg-muted/30">
+                  <td className="px-2 py-2">{b.username}</td>
+                  <td className="px-2 py-2 hidden sm:table-cell">{b.location || "—"}</td>
+                  <td className="px-2 py-2">
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                      b.status === "service" ? "bg-purple-100 text-purple-700" :
+                      b.status === "work" ? "bg-blue-100 text-blue-700" :
+                      "bg-gray-100 text-gray-700"
+                    }`}>
+                      {b.status}
+                    </span>
+                  </td>
+                  <td className="px-2 py-2">
+                    <button onClick={() => togglePublish(b.id, b.is_published)} className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${b.is_published ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"}`}>
+                      {b.is_published ? "✓" : "⏳"}
+                    </button>
+                  </td>
+                  <td className="px-2 py-2 flex gap-1">
+                    <button onClick={() => openEditModal(b)} className="text-primary">
+                      <i className="fas fa-edit text-xs"></i>
+                    </button>
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
@@ -924,91 +835,34 @@ function BusinessContent() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm px-3 py-10">
           <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl bg-card border border-border shadow-2xl p-4">
             <div className="flex items-center justify-between mb-3">
-              <h2 className="text-base font-bold">Edit: {editing.full_name}</h2>
+              <h2 className="text-base font-bold">Edit Business: {editing.username}</h2>
               <button onClick={closeEditModal} className="text-muted-foreground hover:text-foreground">
                 <i className="fas fa-times text-lg"></i>
               </button>
             </div>
             <form onSubmit={handleSaveBusiness} className="space-y-3">
               <div className="grid grid-cols-1 gap-3">
-                <div>
-                  <label className="block text-[10px] font-medium text-muted-foreground">WhatsApp</label>
-                  <input
-                    value={form.whatsapp}
-                    onChange={(e) => setForm({ ...form, whatsapp: e.target.value })}
-                    placeholder="2557XXXXXXXX"
-                    className="w-full border border-border rounded-lg px-3 py-1.5 bg-input text-xs"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-medium text-muted-foreground">Phone</label>
-                  <input
-                    value={form.phone}
-                    onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                    placeholder="2557XXXXXXXX"
-                    className="w-full border border-border rounded-lg px-3 py-1.5 bg-input text-xs"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-medium text-muted-foreground">Location</label>
-                  <input
-                    value={form.location}
-                    onChange={(e) => setForm({ ...form, location: e.target.value })}
-                    placeholder="Location"
-                    className="w-full border border-border rounded-lg px-3 py-1.5 bg-input text-xs"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-medium text-muted-foreground">Services</label>
-                  <textarea
-                    value={form.services}
-                    onChange={(e) => setForm({ ...form, services: e.target.value })}
-                    placeholder="Services"
-                    rows={2}
-                    className="w-full border border-border rounded-lg px-3 py-1.5 bg-input text-xs"
-                  />
+                <input value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} placeholder="Username" className="w-full border border-border rounded-lg px-3 py-1.5 bg-input text-xs" required />
+                <input value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} placeholder="Location" className="w-full border border-border rounded-lg px-3 py-1.5 bg-input text-xs" />
+                <input value={form.bio} onChange={(e) => setForm({ ...form, bio: e.target.value })} placeholder="Bio" className="w-full border border-border rounded-lg px-3 py-1.5 bg-input text-xs" />
+                <input value={form.services} onChange={(e) => setForm({ ...form, services: e.target.value })} placeholder="Services" className="w-full border border-border rounded-lg px-3 py-1.5 bg-input text-xs" />
+                <div className="grid grid-cols-2 gap-2">
+                  <input type="number" value={form.price_tsh} onChange={(e) => setForm({ ...form, price_tsh: Number(e.target.value) })} placeholder="Price (TSh)" className="w-full border border-border rounded-lg px-3 py-1.5 bg-input text-xs" />
+                  <input value={form.price_label} onChange={(e) => setForm({ ...form, price_label: e.target.value })} placeholder="Price Label" className="w-full border border-border rounded-lg px-3 py-1.5 bg-input text-xs" />
+                  <input value={form.whatsapp} onChange={(e) => setForm({ ...form, whatsapp: e.target.value })} placeholder="WhatsApp" className="w-full border border-border rounded-lg px-3 py-1.5 bg-input text-xs" />
+                  <input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="Phone" className="w-full border border-border rounded-lg px-3 py-1.5 bg-input text-xs" />
+                  <input value={form.avatar_url} onChange={(e) => setForm({ ...form, avatar_url: e.target.value })} placeholder="Avatar URL" className="col-span-2 border border-border rounded-lg px-3 py-1.5 bg-input text-xs" />
+                  <input value={form.cover_url} onChange={(e) => setForm({ ...form, cover_url: e.target.value })} placeholder="Cover URL" className="col-span-2 border border-border rounded-lg px-3 py-1.5 bg-input text-xs" />
                 </div>
                 <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="block text-[10px] font-medium text-muted-foreground">Price (SQ)</label>
-                    <input
-                      type="number"
-                      value={form.contact_price}
-                      onChange={(e) => setForm({ ...form, contact_price: Number(e.target.value) })}
-                      placeholder="10"
-                      className="w-full border border-border rounded-lg px-3 py-1.5 bg-input text-xs"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-medium text-muted-foreground">Approved</label>
-                    <select
-                      value={form.is_approved ? "true" : "false"}
-                      onChange={(e) => setForm({ ...form, is_approved: e.target.value === "true" })}
-                      className="w-full border border-border rounded-lg px-3 py-1.5 bg-input text-xs"
-                    >
-                      <option value="true">Yes</option>
-                      <option value="false">No</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-medium text-muted-foreground">Confirmed</label>
-                    <select
-                      value={form.is_confirmed ? "true" : "false"}
-                      onChange={(e) => setForm({ ...form, is_confirmed: e.target.value === "true" })}
-                      className="w-full border border-border rounded-lg px-3 py-1.5 bg-input text-xs"
-                    >
-                      <option value="true">Yes</option>
-                      <option value="false">No</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-medium text-muted-foreground">Service Prices (JSON)</label>
-                    <input
-                      value={form.service_prices}
-                      onChange={(e) => setForm({ ...form, service_prices: e.target.value })}
-                      placeholder='{"massage":10}'
-                      className="w-full border border-border rounded-lg px-3 py-1.5 bg-input text-xs font-mono"
-                    />
+                  <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })} className="border border-border rounded-lg px-3 py-1.5 bg-input text-xs">
+                    <option value="free">Free</option>
+                    <option value="work">Work</option>
+                    <option value="service">Service</option>
+                  </select>
+                  <div className="flex items-center gap-2">
+                    <label className="text-xs text-muted-foreground">Published:</label>
+                    <input type="checkbox" checked={form.is_published} onChange={(e) => setForm({ ...form, is_published: e.target.checked })} className="rounded border-border" />
                   </div>
                 </div>
               </div>
@@ -1028,14 +882,19 @@ function BusinessContent() {
   );
 }
 
-// ==================== STORIES ====================
+// ============================================================
+// STORIES
+// ============================================================
 function StoriesContent() {
   const [stories, setStories] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const fetchStories = async () => {
     setLoading(true);
-    const { data } = await supabase.from("stories").select("*, profiles(full_name)").order("created_at", { ascending: false });
+    const { data } = await supabase
+      .from("stories")
+      .select("*, profiles!stories_user_id_fkey (username)")
+      .order("created_at", { ascending: false });
     setStories(data || []);
     setLoading(false);
   };
@@ -1074,7 +933,7 @@ function StoriesContent() {
             <tbody className="divide-y divide-border">
               {stories.map((s) => (
                 <tr key={s.id} className="hover:bg-muted/30">
-                  <td className="px-2 py-2">{s.profiles?.full_name || "—"}</td>
+                  <td className="px-2 py-2">{s.profiles?.username || "—"}</td>
                   <td className="px-2 py-2">
                     <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
                       s.status === "approved" ? "bg-green-100 text-green-700" :
@@ -1086,19 +945,9 @@ function StoriesContent() {
                   </td>
                   <td className="px-2 py-2 hidden sm:table-cell">{s.expires_at ? new Date(s.expires_at).toLocaleDateString() : "—"}</td>
                   <td className="px-2 py-2 flex gap-1">
-                    {s.status !== "approved" && (
-                      <button onClick={() => updateStatus(s.id, "approved")} className="text-green-500">
-                        <i className="fas fa-check text-xs"></i>
-                      </button>
-                    )}
-                    {s.status !== "rejected" && (
-                      <button onClick={() => updateStatus(s.id, "rejected")} className="text-red-500">
-                        <i className="fas fa-times text-xs"></i>
-                      </button>
-                    )}
-                    <button onClick={() => deleteStory(s.id)} className="text-destructive/70">
-                      <i className="fas fa-trash-alt text-xs"></i>
-                    </button>
+                    {s.status !== "approved" && <button onClick={() => updateStatus(s.id, "approved")} className="text-green-500"><i className="fas fa-check text-xs"></i></button>}
+                    {s.status !== "rejected" && <button onClick={() => updateStatus(s.id, "rejected")} className="text-red-500"><i className="fas fa-times text-xs"></i></button>}
+                    <button onClick={() => deleteStory(s.id)} className="text-destructive/70"><i className="fas fa-trash-alt text-xs"></i></button>
                   </td>
                 </tr>
               ))}
@@ -1110,12 +959,14 @@ function StoriesContent() {
   );
 }
 
-// ==================== REDEEM ====================
+// ============================================================
+// REDEEM
+// ============================================================
 function RedeemContent() {
   const [links, setLinks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ code: "", coins: 10, max_uses: 1, expires_at: "" });
+  const [form, setForm] = useState({ code: "", coins_sq: 10, max_uses: 1, expires_at: "", is_active: true });
 
   const fetchLinks = async () => {
     setLoading(true);
@@ -1135,14 +986,14 @@ function RedeemContent() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const payload = { ...form, coins: Number(form.coins), max_uses: Number(form.max_uses) };
+    const payload = { ...form, coins_sq: Number(form.coins_sq), max_uses: Number(form.max_uses) };
     if (!payload.code) payload.code = generateCode();
     const { data: { user } } = await supabase.auth.getUser();
     if (user) payload.created_by = user.id;
     await supabase.from("redeem_links").insert(payload);
     toast.success("Redeem link created");
     setShowForm(false);
-    setForm({ code: "", coins: 10, max_uses: 1, expires_at: "" });
+    setForm({ code: "", coins_sq: 10, max_uses: 1, expires_at: "", is_active: true });
     fetchLinks();
   };
 
@@ -1158,11 +1009,8 @@ function RedeemContent() {
   return (
     <div>
       <div className="flex justify-between items-center mb-3">
-        <h2 className="text-lg font-bold">Redeem</h2>
-        <button
-          onClick={() => setShowForm(true)}
-          className="bg-primary text-primary-foreground px-3 py-1.5 rounded-lg font-semibold text-xs shadow-[var(--shadow-neon)] hover:opacity-90 transition flex items-center gap-1"
-        >
+        <h2 className="text-lg font-bold">Redeem Links</h2>
+        <button onClick={() => setShowForm(true)} className="bg-primary text-primary-foreground px-3 py-1.5 rounded-lg font-semibold text-xs shadow-[var(--shadow-neon)] hover:opacity-90 transition flex items-center gap-1">
           <i className="fas fa-plus"></i> Create
         </button>
       </div>
@@ -1170,44 +1018,19 @@ function RedeemContent() {
       {showForm && (
         <div className="bg-card p-3 rounded-xl shadow-sm border border-border mb-3">
           <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-2">
-            <input
-              value={form.code}
-              onChange={(e) => setForm({ ...form, code: e.target.value })}
-              placeholder="Code (auto if blank)"
-              className="border border-border rounded-lg px-3 py-1.5 bg-input text-xs"
-            />
+            <input value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} placeholder="Code (auto if blank)" className="border border-border rounded-lg px-3 py-1.5 bg-input text-xs" />
             <div className="grid grid-cols-2 gap-2">
-              <input
-                type="number"
-                value={form.coins}
-                onChange={(e) => setForm({ ...form, coins: Number(e.target.value) })}
-                placeholder="Coins"
-                className="border border-border rounded-lg px-3 py-1.5 bg-input text-xs"
-                required
-              />
-              <input
-                type="number"
-                value={form.max_uses}
-                onChange={(e) => setForm({ ...form, max_uses: Number(e.target.value) })}
-                placeholder="Max uses"
-                className="border border-border rounded-lg px-3 py-1.5 bg-input text-xs"
-                required
-              />
+              <input type="number" value={form.coins_sq} onChange={(e) => setForm({ ...form, coins_sq: Number(e.target.value) })} placeholder="Coins SQ" className="border border-border rounded-lg px-3 py-1.5 bg-input text-xs" required />
+              <input type="number" value={form.max_uses} onChange={(e) => setForm({ ...form, max_uses: Number(e.target.value) })} placeholder="Max uses" className="border border-border rounded-lg px-3 py-1.5 bg-input text-xs" required />
             </div>
-            <input
-              type="datetime-local"
-              value={form.expires_at}
-              onChange={(e) => setForm({ ...form, expires_at: e.target.value })}
-              className="border border-border rounded-lg px-3 py-1.5 bg-input text-xs"
-              required
-            />
+            <input type="datetime-local" value={form.expires_at} onChange={(e) => setForm({ ...form, expires_at: e.target.value })} className="border border-border rounded-lg px-3 py-1.5 bg-input text-xs" />
+            <div className="flex items-center gap-2">
+              <label className="text-xs text-muted-foreground">Active:</label>
+              <input type="checkbox" checked={form.is_active} onChange={(e) => setForm({ ...form, is_active: e.target.checked })} className="rounded border-border" />
+            </div>
             <div className="flex gap-2">
-              <button type="submit" className="bg-primary text-primary-foreground px-4 py-1.5 rounded-lg font-semibold text-xs shadow-[var(--shadow-neon)] hover:opacity-90 transition">
-                Save
-              </button>
-              <button type="button" onClick={() => setShowForm(false)} className="border border-border px-4 py-1.5 rounded-lg text-xs hover:bg-muted transition">
-                Cancel
-              </button>
+              <button type="submit" className="bg-primary text-primary-foreground px-4 py-1.5 rounded-lg font-semibold text-xs shadow-[var(--shadow-neon)] hover:opacity-90 transition">Save</button>
+              <button type="button" onClick={() => setShowForm(false)} className="border border-border px-4 py-1.5 rounded-lg text-xs hover:bg-muted transition">Cancel</button>
             </div>
           </form>
         </div>
@@ -1221,6 +1044,7 @@ function RedeemContent() {
                 <th className="px-2 py-2 text-left font-medium">Code</th>
                 <th className="px-2 py-2 text-left font-medium">Coins</th>
                 <th className="px-2 py-2 text-left font-medium hidden sm:table-cell">Used</th>
+                <th className="px-2 py-2 text-left font-medium">Active</th>
                 <th className="px-2 py-2 text-left font-medium">Actions</th>
               </tr>
             </thead>
@@ -1228,8 +1052,9 @@ function RedeemContent() {
               {links.map((l) => (
                 <tr key={l.id} className="hover:bg-muted/30">
                   <td className="px-2 py-2 font-mono text-[10px]">{l.code}</td>
-                  <td className="px-2 py-2">{l.coins}</td>
-                  <td className="px-2 py-2 hidden sm:table-cell">{l.used || 0} / {l.max_uses}</td>
+                  <td className="px-2 py-2">{l.coins_sq}</td>
+                  <td className="px-2 py-2 hidden sm:table-cell">{l.uses_count} / {l.max_uses}</td>
+                  <td className="px-2 py-2">{l.is_active ? "✓" : "✗"}</td>
                   <td className="px-2 py-2">
                     <button onClick={() => deleteLink(l.id)} className="text-destructive/70">
                       <i className="fas fa-trash-alt text-xs"></i>
@@ -1245,7 +1070,9 @@ function RedeemContent() {
   );
 }
 
-// ==================== SETTINGS ====================
+// ============================================================
+// SETTINGS
+// ============================================================
 function SettingsContent() {
   const [settings, setSettings] = useState({});
   const [loading, setLoading] = useState(true);
@@ -1271,50 +1098,32 @@ function SettingsContent() {
 
   return (
     <div>
-      <h2 className="text-lg font-bold mb-3">Settings</h2>
+      <h2 className="text-lg font-bold mb-3">App Settings</h2>
       <div className="bg-card p-4 rounded-xl shadow-sm border border-border space-y-3">
         <div>
-          <label className="block text-[10px] font-medium text-muted-foreground">SQ to TSh</label>
-          <input
-            type="number"
-            value={settings.sq_to_tsh || "100"}
-            onChange={(e) => updateSetting("sq_to_tsh", e.target.value)}
-            className="border border-border rounded-lg px-3 py-1.5 bg-input text-xs w-24"
-          />
+          <label className="block text-[10px] font-medium text-muted-foreground">SQ to TSh Rate</label>
+          <input type="number" value={settings.sq_to_tsh || "100"} onChange={(e) => updateSetting("sq_to_tsh", e.target.value)} className="border border-border rounded-lg px-3 py-1.5 bg-input text-xs w-24" />
         </div>
         <div>
           <label className="block text-[10px] font-medium text-muted-foreground">Support WhatsApp</label>
-          <input
-            type="text"
-            value={settings.support_whatsapp || ""}
-            onChange={(e) => updateSetting("support_whatsapp", e.target.value)}
-            className="border border-border rounded-lg px-3 py-1.5 bg-input text-xs w-full"
-          />
+          <input type="text" value={settings.support_whatsapp || ""} onChange={(e) => updateSetting("support_whatsapp", e.target.value)} className="border border-border rounded-lg px-3 py-1.5 bg-input text-xs w-full" />
         </div>
         <div>
           <label className="block text-[10px] font-medium text-muted-foreground">WhatsApp Channel</label>
-          <input
-            type="text"
-            value={settings.whatsapp_channel || ""}
-            onChange={(e) => updateSetting("whatsapp_channel", e.target.value)}
-            className="border border-border rounded-lg px-3 py-1.5 bg-input text-xs w-full"
-          />
+          <input type="text" value={settings.whatsapp_channel || ""} onChange={(e) => updateSetting("whatsapp_channel", e.target.value)} className="border border-border rounded-lg px-3 py-1.5 bg-input text-xs w-full" />
         </div>
         <div>
           <label className="block text-[10px] font-medium text-muted-foreground">Support Email</label>
-          <input
-            type="email"
-            value={settings.support_email || ""}
-            onChange={(e) => updateSetting("support_email", e.target.value)}
-            className="border border-border rounded-lg px-3 py-1.5 bg-input text-xs w-full"
-          />
+          <input type="email" value={settings.support_email || ""} onChange={(e) => updateSetting("support_email", e.target.value)} className="border border-border rounded-lg px-3 py-1.5 bg-input text-xs w-full" />
         </div>
       </div>
     </div>
   );
 }
 
-// ==================== LOADING ====================
+// ============================================================
+// LOADING
+// ============================================================
 function Loading() {
   return (
     <div className="flex justify-center items-center h-32">
