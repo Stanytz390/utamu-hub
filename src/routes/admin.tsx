@@ -1,43 +1,6 @@
-import React from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-
-// ============================================================
-// ERROR BOUNDARY
-// ============================================================
-class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean, error: any }> {
-  constructor(props: any) {
-    super(props);
-    this.state = { hasError: false, error: null };
-  }
-  static getDerivedStateFromError(error: any) {
-    return { hasError: true, error };
-  }
-  render() {
-    if (this.state.hasError) {
-      return (
-        <div className="p-10 text-center bg-[#050505] text-white min-h-screen">
-          <h1 className="text-2xl font-bold text-red-500">Something went wrong</h1>
-          <p className="text-muted-foreground mt-2">{this.state.error?.message || "Unknown error"}</p>
-          <button 
-            onClick={() => window.location.reload()} 
-            className="mt-4 bg-primary text-white px-6 py-2 rounded-lg"
-          >
-            Refresh
-          </button>
-          <button 
-            onClick={() => window.location.href = "/"} 
-            className="mt-4 ml-3 bg-gray-700 text-white px-6 py-2 rounded-lg"
-          >
-            Go Home
-          </button>
-        </div>
-      );
-    }
-    return this.props.children;
-  }
-}
 
 // ============================================================
 // ROUTE PROTECTION
@@ -57,11 +20,7 @@ export const Route = createFileRoute("/admin")({
     if (!roleData) throw new Error("Unauthorized Access");
     return { user };
   },
-  component: () => (
-    <ErrorBoundary>
-      <AdminDashboard />
-    </ErrorBoundary>
-  ),
+  component: AdminDashboard,
 });
 
 // ============================================================
@@ -145,7 +104,7 @@ function AdminDashboard() {
           <p className="text-muted-foreground text-sm">Welcome back, Admin.</p>
         </header>
 
-        <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <div>
           {activeTab === "dashboard" && <DashboardContent />}
           {activeTab === "videos" && <VideosContent />}
           {activeTab === "dadaz" && <DadazContent />}
@@ -164,20 +123,18 @@ function AdminDashboard() {
 function DashboardContent() {
   const [stats, setStats] = useState({ users: 0, vids: 0, groups: 0, dadaz: 0 });
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
 
   useEffect(() => {
     const fetchStats = async () => {
       try {
         setLoading(true);
-        setError("");
         const { count: u } = await supabase.from("profiles").select("*", { count: "exact", head: true });
         const { count: v } = await supabase.from("videos").select("*", { count: "exact", head: true });
         const { count: g } = await supabase.from("groups").select("*", { count: "exact", head: true });
         const { count: d } = await supabase.from("dadaz_profiles").select("*", { count: "exact", head: true });
         setStats({ users: u || 0, vids: v || 0, groups: g || 0, dadaz: d || 0 });
-      } catch (err: any) {
-        setError(err.message || "Failed to load stats");
+      } catch (err) {
+        console.error("Error fetching stats:", err);
       } finally {
         setLoading(false);
       }
@@ -185,8 +142,9 @@ function DashboardContent() {
     fetchStats();
   }, []);
 
-  if (loading) return <div className="flex justify-center items-center h-40"><i className="fas fa-spinner fa-spin text-2xl text-primary"></i></div>;
-  if (error) return <div className="text-red-500 p-4">Error: {error}</div>;
+  if (loading) {
+    return <div className="flex justify-center items-center h-40"><i className="fas fa-spinner fa-spin text-2xl text-primary"></i></div>;
+  }
 
   const cards = [
     { label: "Total Users", value: stats.users, icon: "fa-users", color: "text-blue-400" },
@@ -209,24 +167,26 @@ function DashboardContent() {
 }
 
 // ============================================================
-// 2. MANAGE VIDEOS (simplified, no CRUD yet)
+// 2. MANAGE VIDEOS (full CRUD)
 // ============================================================
 function VideosContent() {
   const [vids, setVids] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [showAdd, setShowAdd] = useState(false);
+  const [form, setForm] = useState({
+    title: "",
+    video_url: "",
+    thumbnail_url: "",
+    price_sq: 0,
+  });
 
   const fetchVids = async () => {
     try {
       setLoading(true);
-      setError("");
-      const { data } = await supabase
-        .from("videos")
-        .select("*")
-        .order("created_at", { ascending: false });
+      const { data } = await supabase.from("videos").select("*").order("created_at", { ascending: false });
       setVids(data || []);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err) {
+      console.error(err);
     } finally {
       setLoading(false);
     }
@@ -234,18 +194,74 @@ function VideosContent() {
 
   useEffect(() => { fetchVids(); }, []);
 
+  const save = async (e: any) => {
+    e.preventDefault();
+    try {
+      const payload = {
+        title: form.title,
+        video_url: form.video_url,
+        thumbnail_url: form.thumbnail_url || null,
+        price_tsh: form.price_sq * 100,
+        is_published: true,
+        creator: "Admin",
+        category_slug: "utamu",
+      };
+      const { error } = await supabase.from("videos").insert([payload]);
+      if (error) throw error;
+      alert("Video Added!");
+      setShowAdd(false);
+      setForm({ title: "", video_url: "", thumbnail_url: "", price_sq: 0 });
+      fetchVids();
+    } catch (err: any) {
+      alert("Error: " + err.message);
+    }
+  };
+
+  const deleteVideo = async (id: string) => {
+    if (!confirm("Delete this video?")) return;
+    try {
+      await supabase.from("videos").delete().eq("id", id);
+      alert("Video deleted");
+      fetchVids();
+    } catch (err: any) {
+      alert("Error: " + err.message);
+    }
+  };
+
   if (loading) return <div className="flex justify-center items-center h-40"><i className="fas fa-spinner fa-spin text-2xl text-primary"></i></div>;
-  if (error) return <div className="text-red-500 p-4">Error: {error}</div>;
 
   return (
-    <div>
-      <p className="text-muted-foreground mb-4">Total: {vids.length} videos</p>
+    <div className="space-y-6">
+      <button onClick={() => setShowAdd(!showAdd)} className="w-full md:w-auto bg-primary py-4 px-8 rounded-2xl font-black flex items-center justify-center gap-2 shadow-neon transition-transform active:scale-95">
+        {showAdd ? <i className="fas fa-times"></i> : <i className="fas fa-plus"></i>} {showAdd ? "CANCEL" : "ADD NEW VIDEO"}
+      </button>
+
+      {showAdd && (
+        <form onSubmit={save} className="bg-[#111] p-6 rounded-3xl border border-primary/20 space-y-4 max-w-2xl">
+          <input placeholder="Title" required className="w-full bg-black/50 border border-white/10 p-4 rounded-2xl text-sm" onChange={e => setForm({...form, title: e.target.value})} />
+          <input placeholder="Video MP4 Link" required className="w-full bg-black/50 border border-white/10 p-4 rounded-2xl text-sm" onChange={e => setForm({...form, video_url: e.target.value})} />
+          <input placeholder="Thumbnail Image Link" className="w-full bg-black/50 border border-white/10 p-4 rounded-2xl text-sm" onChange={e => setForm({...form, thumbnail_url: e.target.value})} />
+          <input type="number" placeholder="Price SQ (0 for Free)" className="w-full bg-black/50 border border-white/10 p-4 rounded-2xl text-sm" onChange={e => setForm({...form, price_sq: Number(e.target.value)})} />
+          <button type="submit" className="w-full bg-white text-black py-4 rounded-2xl font-black uppercase tracking-tighter">Publish Now</button>
+        </form>
+      )}
+
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {vids.map(v => (
-          <div key={v.id} className="bg-[#111] rounded-3xl border border-white/5 p-4">
-            <h4 className="font-bold truncate">{v.title}</h4>
-            <p className="text-xs text-muted-foreground">{v.views_count} views</p>
-            <p className="text-xs text-primary">{v.price_tsh / 100} SQ</p>
+          <div key={v.id} className="bg-[#111] rounded-3xl border border-white/5 overflow-hidden group">
+            <div className="relative aspect-video">
+              <img src={v.thumbnail_url || "https://via.placeholder.com/300x200"} className="w-full h-full object-cover" />
+              <div className="absolute top-2 right-2 bg-black/60 backdrop-blur-md px-2 py-1 rounded-lg text-[10px] font-bold">{v.price_tsh / 100} SQ</div>
+            </div>
+            <div className="p-4 flex items-center justify-between">
+              <div className="min-w-0 flex-1">
+                <p className="font-bold text-sm truncate">{v.title}</p>
+                <p className="text-[10px] text-muted-foreground uppercase">{v.views_count || 0} Views</p>
+              </div>
+              <button onClick={() => deleteVideo(v.id)} className="text-red-500 p-2 hover:bg-red-500/10 rounded-xl transition-colors">
+                <i className="fas fa-trash"></i>
+              </button>
+            </div>
           </div>
         ))}
       </div>
@@ -259,16 +275,14 @@ function VideosContent() {
 function DadazContent() {
   const [dadaz, setDadaz] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
 
   const fetchDadaz = async () => {
     try {
       setLoading(true);
-      setError("");
       const { data } = await supabase.from("dadaz_profiles").select("*").order("created_at", { ascending: false });
       setDadaz(data || []);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err) {
+      console.error(err);
     } finally {
       setLoading(false);
     }
@@ -276,23 +290,54 @@ function DadazContent() {
 
   useEffect(() => { fetchDadaz(); }, []);
 
+  const toggleApproval = async (id: string, current: boolean) => {
+    try {
+      await supabase.from("dadaz_profiles").update({ is_admin_approved: !current }).eq("id", id);
+      alert(!current ? "Approved!" : "Unapproved");
+      fetchDadaz();
+    } catch (err: any) {
+      alert("Error: " + err.message);
+    }
+  };
+
+  const deleteDadaz = async (id: string) => {
+    if (!confirm("Delete this profile?")) return;
+    try {
+      await supabase.from("dadaz_profiles").delete().eq("id", id);
+      alert("Deleted");
+      fetchDadaz();
+    } catch (err: any) {
+      alert("Error: " + err.message);
+    }
+  };
+
   if (loading) return <div className="flex justify-center items-center h-40"><i className="fas fa-spinner fa-spin text-2xl text-primary"></i></div>;
-  if (error) return <div className="text-red-500 p-4">Error: {error}</div>;
 
   return (
     <div>
       <p className="text-muted-foreground mb-4">Total: {dadaz.length} profiles</p>
       <div className="space-y-3">
         {dadaz.map(d => (
-          <div key={d.id} className="bg-[#111] p-4 rounded-3xl border border-white/5 flex items-center gap-4">
-            <img src={d.avatar_url || "https://via.placeholder.com/100"} className="w-12 h-12 rounded-full object-cover" />
-            <div>
-              <h4 className="font-bold">@{d.username}</h4>
-              <p className="text-xs text-muted-foreground">{d.location || "TZ"}</p>
+          <div key={d.id} className="bg-[#111] p-4 rounded-3xl border border-white/5 flex flex-col sm:flex-row gap-4 items-center">
+            <img src={d.avatar_url || "https://via.placeholder.com/100"} className="w-16 h-16 rounded-full border-2 border-primary object-cover" />
+            <div className="flex-1 text-center sm:text-left min-w-0">
+              <h4 className="font-black text-lg italic">@{d.username}</h4>
+              <p className="text-xs text-muted-foreground truncate">{d.bio || "No bio set"}</p>
+              <div className="mt-2 flex flex-wrap justify-center sm:justify-start gap-2">
+                <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase ${d.is_admin_approved ? "bg-green-500/20 text-green-400" : "bg-yellow-500/20 text-yellow-400"}`}>
+                  {d.is_admin_approved ? "Verified" : "Pending"}
+                </span>
+                <span className="bg-white/5 px-2 py-0.5 rounded-full text-[9px] font-bold text-muted-foreground uppercase">{d.location || "TZ"}</span>
+              </div>
             </div>
-            <span className={`px-2 py-1 rounded-full text-[10px] ${d.is_admin_approved ? "bg-green-500/20 text-green-400" : "bg-yellow-500/20 text-yellow-400"}`}>
-              {d.is_admin_approved ? "Verified" : "Pending"}
-            </span>
+            <div className="flex gap-2 w-full sm:w-auto">
+              <button onClick={() => toggleApproval(d.id, d.is_admin_approved)} className={`flex-1 sm:flex-initial p-3 rounded-2xl transition-all ${d.is_admin_approved ? "bg-red-500/10 text-red-400" : "bg-green-500/20 text-green-400"}`}>
+                {d.is_admin_approved ? <i className="fas fa-times"></i> : <i className="fas fa-check"></i>}
+              </button>
+              <button onClick={() => deleteDadaz(d.id)} className="flex-1 sm:flex-initial p-3 bg-red-500/10 text-red-500 rounded-2xl">
+                <i className="fas fa-trash"></i>
+              </button>
+            </div>
           </div>
         ))}
       </div>
@@ -306,16 +351,16 @@ function DadazContent() {
 function GroupsContent() {
   const [groups, setGroups] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [showAdd, setShowAdd] = useState(false);
+  const [form, setForm] = useState({ name: "", link: "", description: "" });
 
   const fetchGroups = async () => {
     try {
       setLoading(true);
-      setError("");
       const { data } = await supabase.from("groups").select("*").order("created_at", { ascending: false });
       setGroups(data || []);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err) {
+      console.error(err);
     } finally {
       setLoading(false);
     }
@@ -323,19 +368,62 @@ function GroupsContent() {
 
   useEffect(() => { fetchGroups(); }, []);
 
+  const save = async (e: any) => {
+    e.preventDefault();
+    try {
+      const { error } = await supabase.from("groups").insert([{ 
+        name: form.name, 
+        link: form.link, 
+        description: form.description, 
+        is_published: true,
+        price_sq: 0 
+      }]);
+      if (error) throw error;
+      alert("Group Added!");
+      setShowAdd(false);
+      setForm({ name: "", link: "", description: "" });
+      fetchGroups();
+    } catch (err: any) {
+      alert("Error: " + err.message);
+    }
+  };
+
+  const deleteGroup = async (id: string) => {
+    if (!confirm("Delete this group?")) return;
+    try {
+      await supabase.from("groups").delete().eq("id", id);
+      alert("Deleted");
+      fetchGroups();
+    } catch (err: any) {
+      alert("Error: " + err.message);
+    }
+  };
+
   if (loading) return <div className="flex justify-center items-center h-40"><i className="fas fa-spinner fa-spin text-2xl text-primary"></i></div>;
-  if (error) return <div className="text-red-500 p-4">Error: {error}</div>;
 
   return (
-    <div>
-      <p className="text-muted-foreground mb-4">Total: {groups.length} groups</p>
+    <div className="space-y-6">
+      <button onClick={() => setShowAdd(!showAdd)} className="w-full md:w-auto bg-secondary text-black py-4 px-8 rounded-2xl font-black flex items-center justify-center gap-2 active:scale-95 transition-all">
+        {showAdd ? <i className="fas fa-times"></i> : <i className="fas fa-plus"></i>} {showAdd ? "CANCEL" : "ADD NEW GROUP"}
+      </button>
+
+      {showAdd && (
+        <form onSubmit={save} className="bg-[#111] p-6 rounded-3xl border border-secondary/20 space-y-4 max-w-2xl">
+          <input placeholder="Group Name" required className="w-full bg-black/50 border border-white/10 p-4 rounded-2xl text-sm" onChange={e => setForm({...form, name: e.target.value})} />
+          <input placeholder="WhatsApp/Telegram Link" required className="w-full bg-black/50 border border-white/10 p-4 rounded-2xl text-sm" onChange={e => setForm({...form, link: e.target.value})} />
+          <textarea placeholder="Description" className="w-full bg-black/50 border border-white/10 p-4 rounded-2xl text-sm" onChange={e => setForm({...form, description: e.target.value})} />
+          <button type="submit" className="w-full bg-white text-black py-4 rounded-2xl font-black uppercase tracking-tighter">Save Group</button>
+        </form>
+      )}
+
       <div className="space-y-3">
         {groups.map(g => (
           <div key={g.id} className="bg-[#111] p-4 rounded-3xl border border-white/5 flex items-center justify-between">
-            <div>
-              <h4 className="font-bold">{g.name}</h4>
-              <p className="text-xs text-muted-foreground truncate">{g.link}</p>
+            <div className="min-w-0 flex-1">
+              <h4 className="font-bold truncate">{g.name}</h4>
+              <p className="text-[10px] text-secondary font-black truncate uppercase">{g.link}</p>
             </div>
+            <button onClick={() => deleteGroup(g.id)} className="text-red-500 p-2"><i className="fas fa-trash"></i></button>
           </div>
         ))}
       </div>
@@ -349,16 +437,16 @@ function GroupsContent() {
 function RedeemContent() {
   const [codes, setCodes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [amt, setAmt] = useState(10);
+  const [uses, setUses] = useState(1);
 
   const fetchCodes = async () => {
     try {
       setLoading(true);
-      setError("");
       const { data } = await supabase.from("redeem_links").select("*").order("created_at", { ascending: false });
       setCodes(data || []);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err) {
+      console.error(err);
     } finally {
       setLoading(false);
     }
@@ -366,20 +454,73 @@ function RedeemContent() {
 
   useEffect(() => { fetchCodes(); }, []);
 
+  const generate = async () => {
+    try {
+      const code = "UTAMU-" + Math.random().toString(36).substring(2, 7).toUpperCase();
+      const { error } = await supabase.from("redeem_links").insert({
+        code, coins_sq: amt, max_uses: uses, is_active: true
+      });
+      if (error) throw error;
+      alert("Code Created!");
+      fetchCodes();
+    } catch (err: any) {
+      alert("Error: " + err.message);
+    }
+  };
+
+  const deleteCode = async (id: string) => {
+    if (!confirm("Delete this code?")) return;
+    try {
+      await supabase.from("redeem_links").delete().eq("id", id);
+      alert("Deleted");
+      fetchCodes();
+    } catch (err: any) {
+      alert("Error: " + err.message);
+    }
+  };
+
   if (loading) return <div className="flex justify-center items-center h-40"><i className="fas fa-spinner fa-spin text-2xl text-primary"></i></div>;
-  if (error) return <div className="text-red-500 p-4">Error: {error}</div>;
 
   return (
-    <div>
-      <p className="text-muted-foreground mb-4">Total: {codes.length} codes</p>
-      <div className="space-y-2">
-        {codes.map(c => (
-          <div key={c.id} className="bg-[#111] p-4 rounded-3xl border border-white/5 flex items-center justify-between">
-            <span className="font-mono text-primary font-bold">{c.code}</span>
-            <span>{c.coins_sq} SQ</span>
-            <span className="text-xs text-muted-foreground">{c.uses_count}/{c.max_uses}</span>
+    <div className="space-y-6">
+      <div className="bg-[#111] p-6 rounded-3xl border border-white/5 space-y-4 max-w-xl">
+        <h3 className="font-black text-lg">Generate Voucher</h3>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="text-[10px] font-bold text-muted-foreground uppercase ml-1">Coins (SQ)</label>
+            <input type="number" value={amt} onChange={e => setAmt(Number(e.target.value))} className="w-full bg-black/50 border border-white/10 p-4 rounded-2xl mt-1" />
           </div>
-        ))}
+          <div>
+            <label className="text-[10px] font-bold text-muted-foreground uppercase ml-1">Max Uses</label>
+            <input type="number" value={uses} onChange={e => setUses(Number(e.target.value))} className="w-full bg-black/50 border border-white/10 p-4 rounded-2xl mt-1" />
+          </div>
+        </div>
+        <button onClick={generate} className="w-full bg-primary py-4 rounded-2xl font-black shadow-neon">GENERATE CODE</button>
+      </div>
+
+      <div className="bg-[#111] rounded-3xl border border-white/5 overflow-hidden">
+        <table className="w-full text-xs text-left">
+          <thead className="bg-white/5">
+            <tr>
+              <th className="p-4">CODE</th>
+              <th className="p-4">SQ</th>
+              <th className="p-4">USES</th>
+              <th className="p-4"></th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-white/5">
+            {codes.map(c => (
+              <tr key={c.id}>
+                <td className="p-4 font-mono text-primary font-bold">{c.code}</td>
+                <td className="p-4 font-black">{c.coins_sq}</td>
+                <td className="p-4 text-muted-foreground">{c.uses_count}/{c.max_uses}</td>
+                <td className="p-4 text-right">
+                  <button onClick={() => deleteCode(c.id)} className="text-red-500"><i className="fas fa-trash"></i></button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </div>
   );
@@ -391,19 +532,17 @@ function RedeemContent() {
 function SettingsContent() {
   const [settings, setSettings] = useState<any>({});
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
 
   useEffect(() => {
     const fetch = async () => {
       try {
         setLoading(true);
-        setError("");
         const { data } = await supabase.from("app_settings").select("*");
         const s: any = {};
         data?.forEach(item => s[item.key] = item.value);
         setSettings(s);
-      } catch (err: any) {
-        setError(err.message);
+      } catch (err) {
+        console.error(err);
       } finally {
         setLoading(false);
       }
@@ -411,32 +550,45 @@ function SettingsContent() {
     fetch();
   }, []);
 
+  const save = async (key: string, value: any) => {
+    try {
+      const { error } = await supabase.from("app_settings").upsert({ key, value });
+      if (error) throw error;
+      alert(`Updated ${key}!`);
+    } catch (err: any) {
+      alert("Error: " + err.message);
+    }
+  };
+
   if (loading) return <div className="flex justify-center items-center h-40"><i className="fas fa-spinner fa-spin text-2xl text-primary"></i></div>;
-  if (error) return <div className="text-red-500 p-4">Error: {error}</div>;
 
   return (
-    <div className="bg-[#111] p-6 rounded-3xl border border-white/5 max-w-2xl space-y-4">
-      <div>
-        <label className="block text-xs text-muted-foreground">SQ to TSh Rate</label>
-        <div className="flex gap-2 mt-1">
-          <input 
-            value={settings.sq_to_tsh || "100"} 
-            onChange={(e) => setSettings({...settings, sq_to_tsh: e.target.value})} 
-            className="flex-1 bg-black/50 border border-white/10 p-3 rounded-2xl"
-          />
-          <button 
-            onClick={async () => {
-              const { error } = await supabase.from("app_settings").upsert({ key: "sq_to_tsh", value: settings.sq_to_tsh });
-              if (error) alert(error.message);
-              else alert("Updated!");
-            }} 
-            className="bg-white text-black px-4 rounded-2xl font-bold"
-          >
-            Save
-          </button>
+    <div className="space-y-6 max-w-2xl">
+      <div className="bg-[#111] p-6 rounded-3xl border border-white/5 space-y-6">
+        <div>
+          <label className="text-[10px] font-black uppercase text-primary ml-1 tracking-widest">SQ to TSh Rate (1 SQ = ? TSh)</label>
+          <div className="flex gap-2 mt-2">
+            <input value={settings.sq_to_tsh || "100"} onChange={e => setSettings({...settings, sq_to_tsh: e.target.value})} className="flex-1 bg-black/50 border border-white/10 p-4 rounded-2xl" />
+            <button onClick={() => save("sq_to_tsh", settings.sq_to_tsh)} className="bg-white text-black px-6 rounded-2xl font-bold"><i className="fas fa-save"></i></button>
+          </div>
+        </div>
+
+        <div>
+          <label className="text-[10px] font-black uppercase text-secondary ml-1 tracking-widest">Support WhatsApp Number</label>
+          <div className="flex gap-2 mt-2">
+            <input value={settings.support_whatsapp || ""} onChange={e => setSettings({...settings, support_whatsapp: e.target.value})} placeholder="+255..." className="flex-1 bg-black/50 border border-white/10 p-4 rounded-2xl" />
+            <button onClick={() => save("support_whatsapp", settings.support_whatsapp)} className="bg-white text-black px-6 rounded-2xl font-bold"><i className="fas fa-save"></i></button>
+          </div>
+        </div>
+        
+        <div>
+          <label className="text-[10px] font-black uppercase text-purple-400 ml-1 tracking-widest">WhatsApp Channel Link</label>
+          <div className="flex gap-2 mt-2">
+            <input value={settings.whatsapp_channel || ""} onChange={e => setSettings({...settings, whatsapp_channel: e.target.value})} placeholder="https://chat.whatsapp..." className="flex-1 bg-black/50 border border-white/10 p-4 rounded-2xl" />
+            <button onClick={() => save("whatsapp_channel", settings.whatsapp_channel)} className="bg-white text-black px-6 rounded-2xl font-bold"><i className="fas fa-save"></i></button>
+          </div>
         </div>
       </div>
-      {/* Add other settings similarly */}
     </div>
   );
 }
