@@ -17,7 +17,7 @@ export const Route = createFileRoute("/admin")({
     // If no profile or role not admin, redirect
     if (!profile || profile.role !== "admin") {
       // Check if email matches admin env and auto-promote
-      const adminEmail = import.meta.env.VITE_ADMIN_EMAIL;
+      const adminEmail = import.meta.env.ADMIN_EMAIL;
       if (adminEmail && user.email === adminEmail) {
         // Promote to admin
         await supabase
