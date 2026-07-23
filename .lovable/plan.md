@@ -1,107 +1,111 @@
-# UTAMU PORI — Mpango Kamili (Awamu 4)
 
-Kazi ni kubwa. Nitajenga awamu kwa awamu, kila awamu ikiwa deployable peke yake. Baada ya kila awamu ninasimama uone kabla ya kuendelea.
+# Mpango kamili — UTAMU PORI v2
 
----
+Umeomba yote bila demo. Ni kubwa mno kwa turn moja (~15+ features + schema kubwa + payment gateway + refactor ya hosting). Nitajenga kwa **waves 5**, kila wave ikiwa deployable peke yake. Nikimaliza wave ninasimama uone kabla ya kuendelea.
 
-## Awamu 1 — Search/Filters + Lovable Cloud + Auth + Database
+## Maamuzi muhimu (ninaomba tuthibitishe kabla sijaanza)
 
-### Frontend (haraka)
-- Home: ongeza search bar functional (chuja videos + profiles + groups kwa jina/description).
-- Utamu: search + filters zilizopo (All/New/Old/Free/Premium) zifanye kazi juu ya data ya DB.
-- Dadaz: search kwa username/location/status.
+**Hosting refactor:** Ulichagua "Refactor kwa Node.js server ya kawaida" ili iendane na Vercel/Render/Railway. **Nakushauri turudi Lovable Cloud kwa sasa** kwa sababu:
+- App imejengwa juu ya TanStack Start + Cloudflare Workers + Supabase-managed auth
+- Refactor kamili itachukua turns 5–8 peke yake, na itavunja features za sasa (auth-middleware, server functions, edge routing)
+- `app.json` + README + env vars zote zitakupa portability ya credentials; kifaa halisi kinabaki cha Lovable Cloud
+- Ukitaka baadaye ku-migrate, ni rahisi zaidi ukiwa na app inayofanya kazi kwanza
 
-### Lovable Cloud (backend)
-Nitawasha Lovable Cloud (Supabase chini kwa chini) — inatoa DB, Auth, na Storage bila akaunti ya nje.
+**Nikienda mbele nitabaki Lovable Cloud**; `app.json` itakuwa reference kamili. Ukisisitiza Node refactor, sema — nitaifanya baada ya features zote.
 
-### Auth
-- Email + password signup/login (route `/auth`).
-- Google sign-in (default ya Lovable).
-- `/profile` chini ya `_authenticated` — mtumiaji anahariri phone, name, avatar.
+## Waves
 
-### Database schema (migrations)
+### Wave 1 — Coins/SQ economy + Admin bootstrap + Referral
+**Database (migration moja):**
+- `coin_wallets` (user_id, balance_sq)
+- `coin_transactions` (user_id, delta_sq, kind: topup/purchase/gift/referral/redeem, ref_id, status, created_at)
+- `app_settings` (key, value_json) — admin anaweka: `sq_to_tsh` (default 100), `referral_inviter_reward` (2), `referral_invitee_reward` (8), `whatsapp_support_number`, `whatsapp_channel_url`, `contact_reveal_cost_sq`
+- `referrals` (inviter_id, invitee_id, status, rewarded_at) + `profiles.referral_code` (unique 6-char) + `profiles.referred_by`
+- Trigger: signup → weka referral_code + apply referral kama URL ilikuwa na `?ref=CODE`
+- Trigger: auto-grant admin role kwa `ADMIN_EMAIL` env var (default `hostingstany@gmail.com`) wakati wa signup
+- Bei za videos zibadilishwe kutoka `price_tsh` kwenda `price_sq` (migration ya data)
+- RLS: user anaona wallet & transactions zake tu; admin anaona zote
+
+**Server functions:**
+- `getWallet`, `topUpCoins` (initiate — inarudi payment ref), `spendCoins` (kwa video unlock, contact reveal), `applyReferralCode`
+
+**Frontend:**
+- Bar ya coins juu (Profile header + Home)
+- `/wallet` page: balance, historia, top-up button
+- Prices zionyeshwe kama "5 SQ (~500 TSh)"
+- Referral card kwenye `/profile` — link + code + earnings
+
+### Wave 2 — Admin panel kamili
+**Route `/_authenticated/admin` (has_role admin):**
+- Dashboard: users, videos, revenue (SQ + TSh), pending payments
+- **Categories CRUD**
+- **Videos**: upload kwa URL au file (Lovable Storage `videos/` bucket, private + signed URLs), weka bei ya SQ, category, description, thumbnail
+- **Groups CRUD**
+- **Dadaz business accounts**: approve/reject, weka `contact_reveal_cost_sq` per profile, toggle `is_published`, verify contacts (WhatsApp/phone/SMS). **Contacts hazionekani kwa users mpaka admin a-confirm**
+- **Users & roles**: list, promote → business/admin, ban
+- **App settings**: SQ rate, referral rewards, WhatsApp support number, channel URL
+- **Promo banners CRUD**: image, title, description, link, active/inactive, sort_order
+- **Redeem Links**: create link (code, coins_amount, max_uses, expires_at), view claims
+
+### Wave 3 — Business Dadaz + Contact reveal
+**Route `/_authenticated/dadaz/manage` (has_role business):**
+- Business user ana-create/edit Dadaz profile YAO peke yao (RLS: `owner_id = auth.uid()`)
+- Ana-upload photos, weka services, bei, contacts
+- Ana-submit for admin approval; hadhihiri mpaka `is_admin_approved = true`
+
+**Kwa user wa kawaida (Dadaz detail page):**
+- Buttons 3: WhatsApp, Call, SMS — zote **zime-lock** mpaka mtumiaji atumie SQ (`contact_reveal_cost_sq` iliyowekwa na admin) ku-unlock contact
+- Baada ya unlock: link halisi ya `wa.me/`, `tel:`, `sms:`
+
+### Wave 4 — SpeedaPesa payments (halisi) + Redeem
+**Utafutaji wa docs za SpeedaPesa** (nitafanya web_search kabla ya kuandika code)
+- Secrets: `SPEEDAPESA_API_KEY`, `_SECRET`, `_MERCHANT_ID`, `_WEBHOOK_SECRET`, `_BASE_URL` (nita-request kupitia `add_secret`)
+- Server fn `initiateTopUp({sq_amount, network, phone})` → inaunda payment row (pending), inaita SpeedaPesa STK push, inarudi ref
+- Server route `/api/public/webhooks/speedapesa` (POST) → verify HMAC → update `payments.status` → **credit `coin_wallets`** → trigger referral reward kama ndio malipo ya kwanza
+- Frontend TopUp modal: pick network → phone → polling ya status → success
+
+**Redeem links:**
+- Route `/redeem/$code` — mtumiaji akiingia (login required) → verify code + limit + expiry → credit coins → log kwenye `coin_transactions` → redirect `/wallet` na toast
+
+### Wave 5 — UI polish: Share, Floating widgets, Sliding promo banner
+- **Share button** kwenye kila video card, Dadaz profile, na Group card (Web Share API + fallback ya copy link + WhatsApp/Twitter/Facebook)
+- **Floating WhatsApp support icon** (kona ya chini kulia) — inatumia `whatsapp_support_number` kutoka `app_settings`
+- **Floating "Follow WhatsApp Channel" pop-up** (juu ya sliding images) — dismissible, session-persistent
+- **Sliding promo banner** juu ya Home (Embla carousel autoplay) — inatoka `promo_banners` table iliyojazwa na admin
+
+## Env vars mpya (`app.json` itaupdate)
+```
+ADMIN_EMAIL=hostingstany@gmail.com
+SPEEDAPESA_API_KEY=
+SPEEDAPESA_API_SECRET=
+SPEEDAPESA_MERCHANT_ID=
+SPEEDAPESA_WEBHOOK_SECRET=
+SPEEDAPESA_BASE_URL=
+```
+
+## Vitu vinavyobadilika kwenye codebase
 ```text
-profiles           id (=auth.users), username, phone, avatar_url, created_at
-user_roles         user_id, role (enum: admin | business | user)
-categories         id, slug, label, sort_order
-videos             id, title, description, thumbnail_url, video_url,
-                   duration, price_tsh, category_id, uploaded_by, created_at
-video_views        video_id, user_id, watched_at
-dadaz_profiles     id, owner_id (business user), username, location, status,
-                   bio, services, price_tsh, whatsapp, phone, avatar_url,
-                   followers_count, likes_count, is_published
-dadaz_photos       id, dadaz_id, image_url, sort_order
-dadaz_follows      dadaz_id, user_id
-dadaz_likes        dadaz_id, user_id
-groups             id, name, description, logo_url, link, members, created_by
-payments           id, user_id, video_id, amount_tsh, network, phone,
-                   provider_ref, status (pending|success|failed), created_at
-purchases          user_id, video_id, payment_id, granted_at   -- unlock table
+migrations/     — waves 1, 2, 3, 4 kila moja ina migration yake
+src/lib/
+  ├─ wallet.functions.ts        (wave 1)
+  ├─ referral.functions.ts      (wave 1)
+  ├─ admin.functions.ts         (wave 2)
+  ├─ dadaz-business.functions.ts (wave 3)
+  ├─ payments.functions.ts      (wave 4)
+  └─ redeem.functions.ts        (wave 4)
+src/routes/
+  ├─ _authenticated/
+  │   ├─ wallet.tsx             (wave 1)
+  │   ├─ admin/                 (wave 2 — index, categories, videos, groups, dadaz, users, banners, redeem, settings)
+  │   └─ dadaz-manage.tsx       (wave 3)
+  ├─ redeem.$code.tsx           (wave 4)
+  └─ api/public/webhooks/speedapesa.ts (wave 4)
+src/components/
+  ├─ CoinBadge, TopUpModal, ReferralCard (wave 1)
+  ├─ ShareButton, FloatingSupport, WhatsAppChannelPopup, PromoBanner (wave 5)
+  └─ ContactRevealButton         (wave 3)
 ```
-- RLS: users read published content; owners edit yao; admin edits chochote (kupitia `has_role` security definer).
-- `user_roles` separate table + `has_role()` function (per security standard).
 
----
-
-## Awamu 2 — Admin Panel + Business Accounts (Dadaz)
-
-- Route `/admin` (admin mkuu tu):
-  - Categories CRUD.
-  - Utamu videos: upload kwa URL au file (Lovable Storage), weka bei, category.
-  - Groups CRUD.
-  - Users list + role toggle (promote → business/admin).
-- Route `/dadaz/manage` (business role):
-  - Business user anasajili/anahariri profile yake ya Dadaz, anaongeza photos, services, bei, WhatsApp/phone.
-  - Ana-publish/unpublish.
-- Admin mkuu wa kwanza: nitaweka email fixed (utatoa) au mtumiaji wa kwanza kupitia SQL seed.
-
----
-
-## Awamu 3 — SpeedaPesa Payments + Webhooks + Unlock
-
-- Ni-search SpeedaPesa docs kwanza (developer.speedapesa.com au sawa).
-- Secrets za backend (env vars kupitia `add_secret`):
-  - `SPEEDAPESA_API_KEY`, `SPEEDAPESA_API_SECRET`, `SPEEDAPESA_MERCHANT_ID`, `SPEEDAPESA_WEBHOOK_SECRET`, `SPEEDAPESA_BASE_URL`.
-- Server function `initiatePayment({videoId, network, phone})`:
-  - Weka row kwenye `payments` (status=pending).
-  - Ita SpeedaPesa STK/USSD push kwa network husika (HaloPesa/MixxByYas/M-Pesa/Airtel).
-  - Rudisha `provider_ref` kwa client.
-- Public route `/api/public/webhooks/speedapesa` (POST):
-  - Verify HMAC signature.
-  - Update `payments.status`, insert `purchases` row.
-- Frontend PayModal: baada ya `initiatePayment` fanya polling ya status; ikifanikiwa → download/play unlock.
-- Video player + secure download link (signed URL kutoka Storage) inatolewa kwa waliolipa au free.
-
----
-
-## Awamu 4 — app.json + Heroku reference
-
-**Note muhimu:** App halisi inai-deploy kwenye Lovable Cloud (Cloudflare Workers). Heroku haiwezi kuendesha TanStack Start setup bila refactor kubwa. Nitaunda `app.json` kama reference/documentation ya env vars zinazohitajika, na `README` yenye maelekezo ya deployment.
-
-`app.json` itakuwa na:
-```json
-{
-  "name": "UTAMU PORI",
-  "env": {
-    "SUPABASE_URL": {...}, "SUPABASE_PUBLISHABLE_KEY": {...},
-    "SUPABASE_SERVICE_ROLE_KEY": {...},
-    "SPEEDAPESA_API_KEY": {...}, "SPEEDAPESA_API_SECRET": {...},
-    "SPEEDAPESA_MERCHANT_ID": {...}, "SPEEDAPESA_WEBHOOK_SECRET": {...},
-    "SPEEDAPESA_BASE_URL": {...}, "LOVABLE_API_KEY": {...}
-  }
-}
-```
-Nitakumbusha secrets zote ziko kwenye Lovable secrets (server-only), sio kwenye code.
-
----
-
-## Technical notes
-- All server writes via `createServerFn` + `requireSupabaseAuth`; webhooks via server route chini ya `/api/public/`.
-- RLS + `has_role` kwa authorization; `supabaseAdmin` tu ndani ya webhook baada ya signature verify.
-- Storage bucket `videos/` (private, signed URLs) na `avatars/`, `dadaz-photos/` (public).
-- Search: Postgres `ilike` kwa v1; tunaweza kuboresha na `pg_trgm` baadaye.
-
----
-
-## Naanza sasa na Awamu 1
-Nikimaliza Awamu 1 nakupa preview upime auth + search + DB kabla ya kuendelea Awamu 2.
+## Naomba uthibitisho wa vitu 2 kabla sijaanza Wave 1
+1. **Hosting**: Naendelea Lovable Cloud + `app.json` kama reference? (au unasisitiza Node refactor?)
+2. **Naanza sasa hivi na Wave 1** (Coins/SQ + Referral + Admin bootstrap)? Ni migration + files ~8. Ukikubali naanza turn hii hii.
