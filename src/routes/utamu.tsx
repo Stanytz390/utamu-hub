@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState, useMemo, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { VideoCard } from "@/components/VideoCard";
+import { shareContent } from "@/lib/share";
 
 export const Route = createFileRoute("/utamu")({
   head: () => ({
@@ -35,9 +36,7 @@ function Utamu() {
         `)
         .eq("status", "available"); // Only show available videos
 
-      // Search filter (client-side after fetch for simplicity, but we can do ilike)
-      // We'll fetch all and filter client-side for search as well
-      // Better to apply server-side ilike to reduce data
+      // Search filter
       if (q.trim()) {
         const search = `%${q.trim()}%`;
         query = query.or(
@@ -59,7 +58,7 @@ function Utamu() {
         console.error("Error fetching videos:", error);
         setVideos([]);
       } else {
-        // Map to match expected VideoCard props (price_sq, etc.)
+        // Map to match expected VideoCard props
         const mapped = (data || []).map((v: any) => ({
           ...v,
           creator: v.profiles?.full_name || v.creator || "Unknown",
@@ -71,9 +70,9 @@ function Utamu() {
     };
 
     fetchVideos();
-  }, [f, q]); // refetch when filter or search changes
+  }, [f, q]);
 
-  // Additional client-side filtering for Free/Premium (since price_sq is 0 or >0)
+  // Additional client-side filtering for Free/Premium
   const filteredVideos = useMemo(() => {
     let out = videos;
     if (f === "Free") {
@@ -129,7 +128,16 @@ function Utamu() {
           </p>
         )}
         {filteredVideos.map((v) => (
-          <VideoCard key={v.id} video={v} />
+          <div key={v.id} className="relative">
+            <VideoCard video={v} />
+            <button
+              onClick={() => shareContent('video', v.id, v.title, v.description)}
+              className="absolute top-2 right-2 text-white bg-black/40 rounded-full p-1.5 hover:bg-black/60 transition z-10"
+              aria-label="Share"
+            >
+              <i className="fas fa-share-alt text-xs"></i>
+            </button>
+          </div>
         ))}
       </section>
     </div>
