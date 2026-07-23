@@ -12,6 +12,7 @@ import { useEffect, type ReactNode } from "react";
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { BottomNav } from "../components/BottomNav";
+import { FloatingSupport } from "../components/FloatingSupport";
 import { supabase } from "@/integrations/supabase/client";
 
 function NotFoundComponent() {
@@ -142,6 +143,7 @@ function RootComponent() {
         <Outlet />
       </div>
       <BottomNav />
+      <FloatingSupport />
     </QueryClientProvider>
   );
 }
