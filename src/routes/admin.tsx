@@ -1,5 +1,6 @@
+
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useState } } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast, Toaster } from "sonner";
 
@@ -19,12 +20,10 @@ function AdminDashboard() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [activeTab, setActiveTab] = useState("dashboard");
-  const [user, setUser] = useState<any>(null);
 
   useEffect(() => {
     const isAuth = localStorage.getItem("admin_authenticated") === "true";
     setAuthenticated(isAuth);
-    supabase.auth.getUser().then(({ data }) => setUser(data.user));
   }, []);
 
   const handlePasswordSubmit = (e: React.FormEvent) => {
@@ -46,8 +45,8 @@ function AdminDashboard() {
 
   if (!authenticated) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-50 px-4">
-        <div className="max-w-md w-full bg-white rounded-2xl shadow-xl border border-border p-6">
+      <div className="flex items-center justify-center min-h-screen bg-muted/30 px-4">
+        <div className="max-w-md w-full bg-card rounded-2xl shadow-xl border border-border p-6">
           <div className="text-center mb-6">
             <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-full bg-[image:var(--gradient-primary)] shadow-[var(--shadow-neon)]">
               <i className="fas fa-lock text-2xl text-primary-foreground"></i>
@@ -143,7 +142,7 @@ function AdminDashboard() {
 }
 
 // ============================================================
-// DASHBOARD
+// DASHBOARD (font normal, cards clean)
 // ============================================================
 function DashboardContent() {
   const [stats, setStats] = useState({ users: 0, videos: 0, groups: 0, coins: 0 });
@@ -162,7 +161,7 @@ function DashboardContent() {
   }, []);
   return (
     <div>
-      <h2 className="text-2xl font-black mb-6">Dashboard</h2>
+      <h2 className="text-xl font-bold mb-6">Dashboard</h2>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard title="Users" value={stats.users} icon="fa-users" color="blue" />
         <StatCard title="Videos" value={stats.videos} icon="fa-video" color="purple" />
@@ -192,7 +191,7 @@ function StatCard({ title, value, icon, color }) {
 }
 
 // ============================================================
-// USERS
+// USERS (normal font, small actions)
 // ============================================================
 function UsersContent() {
   const [users, setUsers] = useState([]);
@@ -219,7 +218,7 @@ function UsersContent() {
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-black">Users</h2>
+        <h2 className="text-xl font-bold">Users</h2>
         <span className="text-sm text-muted-foreground">{users.length} total</span>
       </div>
       <div className="bg-card rounded-2xl shadow-sm border border-border overflow-hidden">
@@ -227,31 +226,31 @@ function UsersContent() {
           <table className="w-full text-sm">
             <thead className="bg-muted/50">
               <tr>
-                <th className="px-5 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Name</th>
-                <th className="px-5 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Email</th>
-                <th className="px-5 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Role</th>
-                <th className="px-5 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Phone</th>
-                <th className="px-5 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Actions</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Name</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Email</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Role</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Phone</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
               {users.map(u => (
                 <tr key={u.id} className="hover:bg-muted/30 transition">
-                  <td className="px-5 py-3">{u.full_name || u.username || "—"}</td>
-                  <td className="px-5 py-3">{u.email}</td>
-                  <td className="px-5 py-3">
+                  <td className="px-4 py-2">{u.full_name || u.username || "—"}</td>
+                  <td className="px-4 py-2">{u.email}</td>
+                  <td className="px-4 py-2">
                     <select
                       value={u.role || "user"}
                       onChange={e => updateRole(u.id, e.target.value)}
-                      className="border border-border rounded-lg px-2 py-1 text-sm focus:ring-2 focus:ring-primary focus:outline-none"
+                      className="border border-border rounded-lg px-2 py-1 text-xs focus:ring-2 focus:ring-primary focus:outline-none"
                     >
                       <option value="user">User</option>
                       <option value="business">Business</option>
                       <option value="admin">Admin</option>
                     </select>
                   </td>
-                  <td className="px-5 py-3">{u.phone || "—"}</td>
-                  <td className="px-5 py-3">
+                  <td className="px-4 py-2">{u.phone || "—"}</td>
+                  <td className="px-4 py-2">
                     <button onClick={() => deleteUser(u.id)} className="text-destructive/70 hover:text-destructive transition">
                       <i className="fas fa-trash-alt"></i>
                     </button>
@@ -267,14 +266,23 @@ function UsersContent() {
 }
 
 // ============================================================
-// VIDEOS
+// VIDEOS – Upload video from FILES (mobile/desktop)
 // ============================================================
 function VideosContent() {
   const [videos, setVideos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
-  const [form, setForm] = useState({ title: "", description: "", video_url: "", thumbnail: "", price_sq: 0, status: "pending", category: "" });
+  const [form, setForm] = useState({
+    title: "",
+    description: "",
+    category: "",
+    price_sq: 0,
+    status: "pending",
+    videoFile: null,
+    thumbnailFile: null,
+  });
+  const [uploading, setUploading] = useState(false);
   const [categories, setCategories] = useState([]);
 
   useEffect(() => { fetchVideos(); fetchCategories(); }, []);
@@ -288,9 +296,57 @@ function VideosContent() {
     const { data } = await supabase.from("categories").select("*");
     setCategories(data || []);
   };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const payload = { ...form, price_sq: Number(form.price_sq) };
+    setUploading(true);
+
+    let videoUrl = form.video_url || "";
+    let thumbUrl = form.thumbnail || "";
+
+    // Upload video file to Supabase Storage
+    if (form.videoFile) {
+      const file = form.videoFile;
+      const filePath = `videos/${Date.now()}_${file.name}`;
+      const { data, error } = await supabase.storage
+        .from("utamu_videos")
+        .upload(filePath, file);
+      if (error) {
+        toast.error("Video upload failed: " + error.message);
+        setUploading(false);
+        return;
+      }
+      const { data: urlData } = supabase.storage
+        .from("utamu_videos")
+        .getPublicUrl(filePath);
+      videoUrl = urlData.publicUrl;
+    }
+
+    // Upload thumbnail if present
+    if (form.thumbnailFile) {
+      const file = form.thumbnailFile;
+      const filePath = `thumbnails/${Date.now()}_${file.name}`;
+      const { error } = await supabase.storage
+        .from("utamu_thumbnails")
+        .upload(filePath, file);
+      if (!error) {
+        const { data: urlData } = supabase.storage
+          .from("utamu_thumbnails")
+          .getPublicUrl(filePath);
+        thumbUrl = urlData.publicUrl;
+      }
+    }
+
+    const payload = {
+      title: form.title,
+      description: form.description,
+      video_url: videoUrl,
+      thumbnail: thumbUrl,
+      price_sq: Number(form.price_sq),
+      status: form.status,
+      category: form.category || null,
+    };
+
     if (editing) {
       await supabase.from("videos").update(payload).eq("id", editing.id);
       toast.success("Video updated");
@@ -300,89 +356,154 @@ function VideosContent() {
       await supabase.from("videos").insert(payload);
       toast.success("Video created");
     }
-    setShowForm(false); setEditing(null); setForm({ title: "", description: "", video_url: "", thumbnail: "", price_sq: 0, status: "pending", category: "" });
+
+    setShowForm(false);
+    setEditing(null);
+    setForm({ title: "", description: "", category: "", price_sq: 0, status: "pending", videoFile: null, thumbnailFile: null });
     fetchVideos();
+    setUploading(false);
   };
+
   const deleteVideo = async (id) => {
     if (!confirm("Delete this video?")) return;
     await supabase.from("videos").delete().eq("id", id);
     fetchVideos();
     toast.success("Video deleted");
   };
+
   const toggleStatus = async (id, current) => {
     const newStatus = current === "available" ? "pending" : "available";
     await supabase.from("videos").update({ status: newStatus }).eq("id", id);
     fetchVideos();
     toast.success(`Status changed to ${newStatus}`);
   };
+
   if (loading) return <Loading />;
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-black">Videos</h2>
+        <h2 className="text-xl font-bold">Videos</h2>
         <button
-          onClick={() => { setShowForm(true); setEditing(null); setForm({ title: "", description: "", video_url: "", thumbnail: "", price_sq: 0, status: "pending", category: "" }); }}
-          className="bg-primary text-primary-foreground px-5 py-2.5 rounded-xl font-semibold shadow-[var(--shadow-neon)] hover:opacity-90 transition flex items-center gap-2"
+          onClick={() => { setShowForm(true); setEditing(null); setForm({ title: "", description: "", category: "", price_sq: 0, status: "pending", videoFile: null, thumbnailFile: null }); }}
+          className="bg-primary text-primary-foreground px-4 py-2 rounded-xl font-semibold shadow-[var(--shadow-neon)] hover:opacity-90 transition flex items-center gap-2 text-sm"
         >
           <i className="fas fa-plus"></i> Add Video
         </button>
       </div>
+
       {showForm && (
         <div className="bg-card p-6 rounded-2xl shadow-sm border border-border mb-6">
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <input value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} placeholder="Title" className="border border-border rounded-xl px-4 py-2.5 bg-input focus:ring-2 focus:ring-primary outline-none" required />
-              <textarea value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} placeholder="Description" rows={2} className="border border-border rounded-xl px-4 py-2.5 bg-input focus:ring-2 focus:ring-primary outline-none col-span-2" />
-              <input value={form.video_url} onChange={e => setForm({ ...form, video_url: e.target.value })} placeholder="Video URL" className="border border-border rounded-xl px-4 py-2.5 bg-input focus:ring-2 focus:ring-primary outline-none" required />
-              <input value={form.thumbnail} onChange={e => setForm({ ...form, thumbnail: e.target.value })} placeholder="Thumbnail URL" className="border border-border rounded-xl px-4 py-2.5 bg-input" />
-              <select value={form.category} onChange={e => setForm({ ...form, category: e.target.value })} className="border border-border rounded-xl px-4 py-2.5 bg-input focus:ring-2 focus:ring-primary outline-none">
+              <input
+                value={form.title}
+                onChange={e => setForm({ ...form, title: e.target.value })}
+                placeholder="Title"
+                className="border border-border rounded-xl px-4 py-2 bg-input text-sm focus:ring-2 focus:ring-primary outline-none"
+                required
+              />
+              <textarea
+                value={form.description}
+                onChange={e => setForm({ ...form, description: e.target.value })}
+                placeholder="Description"
+                rows={2}
+                className="border border-border rounded-xl px-4 py-2 bg-input text-sm focus:ring-2 focus:ring-primary outline-none col-span-2"
+              />
+              <select
+                value={form.category}
+                onChange={e => setForm({ ...form, category: e.target.value })}
+                className="border border-border rounded-xl px-4 py-2 bg-input text-sm"
+              >
                 <option value="">Select Category</option>
                 {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
               </select>
-              <input type="number" value={form.price_sq} onChange={e => setForm({ ...form, price_sq: Number(e.target.value) })} placeholder="Price in SQ" className="border border-border rounded-xl px-4 py-2.5 bg-input" />
-              <select value={form.status} onChange={e => setForm({ ...form, status: e.target.value })} className="border border-border rounded-xl px-4 py-2.5 bg-input">
+              <input
+                type="number"
+                value={form.price_sq}
+                onChange={e => setForm({ ...form, price_sq: Number(e.target.value) })}
+                placeholder="Price in SQ"
+                className="border border-border rounded-xl px-4 py-2 bg-input text-sm"
+              />
+              <select
+                value={form.status}
+                onChange={e => setForm({ ...form, status: e.target.value })}
+                className="border border-border rounded-xl px-4 py-2 bg-input text-sm"
+              >
                 <option value="pending">Pending</option>
                 <option value="available">Available</option>
               </select>
+
+              {/* File upload inputs (mobile friendly) */}
+              <div className="col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-muted-foreground mb-1">Video File</label>
+                  <input
+                    type="file"
+                    accept="video/*"
+                    onChange={e => setForm({ ...form, videoFile: e.target.files?.[0] || null })}
+                    className="w-full border border-border rounded-xl px-4 py-2 bg-input text-sm file:mr-2 file:py-1 file:px-3 file:rounded-full file:border-0 file:text-sm file:bg-primary file:text-primary-foreground"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">Tap to choose video from device</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-muted-foreground mb-1">Thumbnail (optional)</label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={e => setForm({ ...form, thumbnailFile: e.target.files?.[0] || null })}
+                    className="w-full border border-border rounded-xl px-4 py-2 bg-input text-sm file:mr-2 file:py-1 file:px-3 file:rounded-full file:border-0 file:text-sm file:bg-primary file:text-primary-foreground"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">Optional image</p>
+                </div>
+              </div>
             </div>
+
             <div className="flex gap-3">
-              <button type="submit" className="bg-primary text-primary-foreground px-6 py-2.5 rounded-xl font-semibold shadow-[var(--shadow-neon)] hover:opacity-90 transition">
+              <button
+                type="submit"
+                disabled={uploading}
+                className="bg-primary text-primary-foreground px-6 py-2 rounded-xl font-semibold shadow-[var(--shadow-neon)] hover:opacity-90 transition text-sm"
+              >
+                {uploading ? <i className="fas fa-spinner fa-spin mr-1"></i> : null}
                 {editing ? "Update" : "Save"}
               </button>
-              <button type="button" onClick={() => setShowForm(false)} className="border border-border px-6 py-2.5 rounded-xl hover:bg-muted transition">
+              <button
+                type="button"
+                onClick={() => setShowForm(false)}
+                className="border border-border px-6 py-2 rounded-xl hover:bg-muted transition text-sm"
+              >
                 Cancel
               </button>
             </div>
           </form>
         </div>
       )}
+
       <div className="bg-card rounded-2xl shadow-sm border border-border overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-muted/50">
               <tr>
-                <th className="px-5 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Title</th>
-                <th className="px-5 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Category</th>
-                <th className="px-5 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Price</th>
-                <th className="px-5 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Status</th>
-                <th className="px-5 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Creator</th>
-                <th className="px-5 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Actions</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Title</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Category</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Price</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Status</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
               {videos.map(v => (
                 <tr key={v.id} className="hover:bg-muted/30 transition">
-                  <td className="px-5 py-3">{v.title}</td>
-                  <td className="px-5 py-3">{v.category || "—"}</td>
-                  <td className="px-5 py-3">{v.price_sq} SQ</td>
-                  <td className="px-5 py-3">
+                  <td className="px-4 py-2">{v.title}</td>
+                  <td className="px-4 py-2">{v.category || "—"}</td>
+                  <td className="px-4 py-2">{v.price_sq} SQ</td>
+                  <td className="px-4 py-2">
                     <button onClick={() => toggleStatus(v.id, v.status)} className={`px-3 py-1 rounded-full text-xs font-semibold ${v.status === "available" ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"}`}>
                       {v.status}
                     </button>
                   </td>
-                  <td className="px-5 py-3">{v.profiles?.full_name || "—"}</td>
-                  <td className="px-5 py-3 flex gap-2">
-                    <button onClick={() => { setEditing(v); setForm(v); setShowForm(true); }} className="text-primary hover:opacity-80 transition">
+                  <td className="px-4 py-2 flex gap-2">
+                    <button onClick={() => { setEditing(v); setForm({ ...v, videoFile: null, thumbnailFile: null }); setShowForm(true); }} className="text-primary hover:opacity-80 transition">
                       <i className="fas fa-edit"></i>
                     </button>
                     <button onClick={() => deleteVideo(v.id)} className="text-destructive/70 hover:text-destructive transition">
@@ -400,7 +521,7 @@ function VideosContent() {
 }
 
 // ============================================================
-// CATEGORIES
+// CATEGORIES (compact)
 // ============================================================
 function CategoriesContent() {
   const [categories, setCategories] = useState([]);
@@ -433,15 +554,15 @@ function CategoriesContent() {
   };
   return (
     <div>
-      <h2 className="text-2xl font-black mb-6">Categories</h2>
+      <h2 className="text-xl font-bold mb-6">Categories</h2>
       <div className="flex gap-3 mb-4">
         <input
           value={newName}
           onChange={e => setNewName(e.target.value)}
           placeholder="New category name"
-          className="flex-1 border border-border rounded-xl px-4 py-2.5 bg-input focus:ring-2 focus:ring-primary outline-none"
+          className="flex-1 border border-border rounded-xl px-4 py-2 bg-input text-sm focus:ring-2 focus:ring-primary outline-none"
         />
-        <button onClick={addCategory} className="bg-primary text-primary-foreground px-6 py-2.5 rounded-xl font-semibold shadow-[var(--shadow-neon)] hover:opacity-90 transition">
+        <button onClick={addCategory} className="bg-primary text-primary-foreground px-4 py-2 rounded-xl font-semibold shadow-[var(--shadow-neon)] hover:opacity-90 transition text-sm">
           <i className="fas fa-plus mr-1"></i> Add
         </button>
       </div>
@@ -450,8 +571,8 @@ function CategoriesContent() {
           <li key={c.id} className="flex items-center justify-between px-5 py-3">
             {editing === c.id ? (
               <div className="flex gap-2 flex-1">
-                <input defaultValue={c.name} onBlur={e => updateCategory(c.id, e.target.value)} className="flex-1 border border-border rounded-lg px-3 py-1 bg-input" autoFocus />
-                <button onClick={() => setEditing(null)} className="text-muted-foreground hover:text-foreground">Cancel</button>
+                <input defaultValue={c.name} onBlur={e => updateCategory(c.id, e.target.value)} className="flex-1 border border-border rounded-lg px-3 py-1 bg-input text-sm" autoFocus />
+                <button onClick={() => setEditing(null)} className="text-muted-foreground hover:text-foreground text-sm">Cancel</button>
               </div>
             ) : (
               <>
@@ -474,7 +595,7 @@ function CategoriesContent() {
 }
 
 // ============================================================
-// GROUPS
+// GROUPS (compact)
 // ============================================================
 function GroupsContent() {
   const [groups, setGroups] = useState([]);
@@ -515,27 +636,24 @@ function GroupsContent() {
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-black">Groups</h2>
-        <button
-          onClick={() => { setShowForm(true); setEditing(null); setForm({ name: "", description: "", logo_url: "", link: "", price_sq: 0 }); }}
-          className="bg-primary text-primary-foreground px-5 py-2.5 rounded-xl font-semibold shadow-[var(--shadow-neon)] hover:opacity-90 transition flex items-center gap-2"
-        >
+        <h2 className="text-xl font-bold">Groups</h2>
+        <button onClick={() => { setShowForm(true); setEditing(null); setForm({ name: "", description: "", logo_url: "", link: "", price_sq: 0 }); }} className="bg-primary text-primary-foreground px-4 py-2 rounded-xl font-semibold shadow-[var(--shadow-neon)] hover:opacity-90 transition flex items-center gap-2 text-sm">
           <i className="fas fa-plus"></i> Add Group
         </button>
       </div>
       {showForm && (
         <div className="bg-card p-6 rounded-2xl shadow-sm border border-border mb-6">
           <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="Name" className="border border-border rounded-xl px-4 py-2.5 bg-input focus:ring-2 focus:ring-primary outline-none" required />
-            <input value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} placeholder="Description" className="border border-border rounded-xl px-4 py-2.5 bg-input" />
-            <input value={form.logo_url} onChange={e => setForm({ ...form, logo_url: e.target.value })} placeholder="Logo URL" className="border border-border rounded-xl px-4 py-2.5 bg-input" />
-            <input value={form.link} onChange={e => setForm({ ...form, link: e.target.value })} placeholder="Group Link" className="border border-border rounded-xl px-4 py-2.5 bg-input" required />
-            <input type="number" value={form.price_sq} onChange={e => setForm({ ...form, price_sq: Number(e.target.value) })} placeholder="Price in SQ (0=free)" className="border border-border rounded-xl px-4 py-2.5 bg-input" />
+            <input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="Name" className="border border-border rounded-xl px-4 py-2 bg-input text-sm" required />
+            <input value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} placeholder="Description" className="border border-border rounded-xl px-4 py-2 bg-input text-sm" />
+            <input value={form.logo_url} onChange={e => setForm({ ...form, logo_url: e.target.value })} placeholder="Logo URL" className="border border-border rounded-xl px-4 py-2 bg-input text-sm" />
+            <input value={form.link} onChange={e => setForm({ ...form, link: e.target.value })} placeholder="Group Link" className="border border-border rounded-xl px-4 py-2 bg-input text-sm" required />
+            <input type="number" value={form.price_sq} onChange={e => setForm({ ...form, price_sq: Number(e.target.value) })} placeholder="Price in SQ (0=free)" className="border border-border rounded-xl px-4 py-2 bg-input text-sm" />
             <div className="flex gap-3 md:col-span-2">
-              <button type="submit" className="bg-primary text-primary-foreground px-6 py-2.5 rounded-xl font-semibold shadow-[var(--shadow-neon)] hover:opacity-90 transition">
+              <button type="submit" className="bg-primary text-primary-foreground px-6 py-2 rounded-xl font-semibold shadow-[var(--shadow-neon)] hover:opacity-90 transition text-sm">
                 {editing ? "Update" : "Save"}
               </button>
-              <button type="button" onClick={() => setShowForm(false)} className="border border-border px-6 py-2.5 rounded-xl hover:bg-muted transition">
+              <button type="button" onClick={() => setShowForm(false)} className="border border-border px-6 py-2 rounded-xl hover:bg-muted transition text-sm">
                 Cancel
               </button>
             </div>
@@ -547,21 +665,21 @@ function GroupsContent() {
           <table className="w-full text-sm">
             <thead className="bg-muted/50">
               <tr>
-                <th className="px-5 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Name</th>
-                <th className="px-5 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Members</th>
-                <th className="px-5 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Price</th>
-                <th className="px-5 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Link</th>
-                <th className="px-5 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Actions</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Name</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Members</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Price</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Link</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
               {groups.map(g => (
                 <tr key={g.id} className="hover:bg-muted/30 transition">
-                  <td className="px-5 py-3">{g.name}</td>
-                  <td className="px-5 py-3">{g.members || 0}</td>
-                  <td className="px-5 py-3">{g.price_sq === 0 ? "Free" : `${g.price_sq} SQ`}</td>
-                  <td className="px-5 py-3"><a href={g.link} target="_blank" rel="noreferrer" className="text-primary hover:underline">Link</a></td>
-                  <td className="px-5 py-3 flex gap-2">
+                  <td className="px-4 py-2">{g.name}</td>
+                  <td className="px-4 py-2">{g.members || 0}</td>
+                  <td className="px-4 py-2">{g.price_sq === 0 ? "Free" : `${g.price_sq} SQ`}</td>
+                  <td className="px-4 py-2"><a href={g.link} target="_blank" rel="noreferrer" className="text-primary hover:underline">Link</a></td>
+                  <td className="px-4 py-2 flex gap-2">
                     <button onClick={() => { setEditing(g); setForm(g); setShowForm(true); }} className="text-primary hover:opacity-80 transition">
                       <i className="fas fa-edit"></i>
                     </button>
@@ -580,7 +698,7 @@ function GroupsContent() {
 }
 
 // ============================================================
-// BUSINESS (DADAZ)
+// BUSINESS (compact)
 // ============================================================
 function BusinessContent() {
   const [businesses, setBusinesses] = useState([]);
@@ -673,7 +791,7 @@ function BusinessContent() {
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-black">Business (Dadaz) Accounts</h2>
+        <h2 className="text-xl font-bold">Business (Dadaz) Accounts</h2>
         <span className="text-sm text-muted-foreground">{businesses.length} total</span>
       </div>
       <div className="bg-card rounded-2xl shadow-sm border border-border overflow-hidden">
@@ -681,15 +799,15 @@ function BusinessContent() {
           <table className="w-full text-sm">
             <thead className="bg-muted/50">
               <tr>
-                <th className="px-5 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Name</th>
-                <th className="px-5 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Email</th>
-                <th className="px-5 py-3 text-left text-xs font-medium text-muted-foreground uppercase">WhatsApp</th>
-                <th className="px-5 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Services</th>
-                <th className="px-5 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Price</th>
-                <th className="px-5 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Approved</th>
-                <th className="px-5 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Contact</th>
-                <th className="px-5 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Balance</th>
-                <th className="px-5 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Actions</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Name</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Email</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">WhatsApp</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Services</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Price</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Approved</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Contact</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Balance</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
@@ -697,22 +815,22 @@ function BusinessContent() {
                 const contact = b.business_contacts?.[0];
                 return (
                   <tr key={b.id} className="hover:bg-muted/30 transition">
-                    <td className="px-5 py-3 flex items-center gap-2">
+                    <td className="px-4 py-2 flex items-center gap-2">
                       <img src={b.avatar_url || "/default-avatar.png"} alt={b.full_name} className="w-6 h-6 rounded-full object-cover" />
                       {b.full_name || b.username || "—"}
                     </td>
-                    <td className="px-5 py-3">{b.email}</td>
-                    <td className="px-5 py-3">{contact?.whatsapp ? <a href={`https://wa.me/${contact.whatsapp}`} target="_blank" rel="noreferrer" className="text-primary hover:underline">{contact.whatsapp}</a> : "—"}</td>
-                    <td className="px-5 py-3 text-xs truncate max-w-[120px]">{contact?.services || "—"}</td>
-                    <td className="px-5 py-3">{contact?.contact_price || 0} SQ</td>
-                    <td className="px-5 py-3">
-                      <button onClick={() => toggleApproval(b.id, b.is_approved)} className={`px-3 py-1 rounded-full text-xs font-semibold ${b.is_approved !== false ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
+                    <td className="px-4 py-2">{b.email}</td>
+                    <td className="px-4 py-2">{contact?.whatsapp ? <a href={`https://wa.me/${contact.whatsapp}`} target="_blank" rel="noreferrer" className="text-primary hover:underline">{contact.whatsapp}</a> : "—"}</td>
+                    <td className="px-4 py-2 text-xs truncate max-w-[120px]">{contact?.services || "—"}</td>
+                    <td className="px-4 py-2">{contact?.contact_price || 0} SQ</td>
+                    <td className="px-4 py-2">
+                      <button onClick={() => toggleApproval(b.id, b.is_approved)} className={`px-2 py-1 rounded-full text-xs font-semibold ${b.is_approved !== false ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
                         {b.is_approved !== false ? "Approved" : "Pending"}
                       </button>
                     </td>
-                    <td className="px-5 py-3">{contact?.is_confirmed ? <i className="fas fa-check-circle text-green-500"></i> : <i className="fas fa-times-circle text-red-500"></i>}</td>
-                    <td className="px-5 py-3 font-semibold">{b.coin_wallets?.[0]?.balance_sq || 0} SQ</td>
-                    <td className="px-5 py-3 flex gap-2">
+                    <td className="px-4 py-2">{contact?.is_confirmed ? <i className="fas fa-check-circle text-green-500"></i> : <i className="fas fa-times-circle text-red-500"></i>}</td>
+                    <td className="px-4 py-2 font-semibold">{b.coin_wallets?.[0]?.balance_sq || 0} SQ</td>
+                    <td className="px-4 py-2 flex gap-2">
                       <button onClick={() => openEditModal(b)} className="text-primary hover:opacity-80 transition">
                         <i className="fas fa-edit"></i>
                       </button>
@@ -742,46 +860,46 @@ function BusinessContent() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-muted-foreground">WhatsApp Number</label>
-                  <input value={form.whatsapp} onChange={e => setForm({ ...form, whatsapp: e.target.value })} placeholder="2557XXXXXXXX" className="w-full border border-border rounded-xl px-3 py-2 bg-input" />
+                  <input value={form.whatsapp} onChange={e => setForm({ ...form, whatsapp: e.target.value })} placeholder="2557XXXXXXXX" className="w-full border border-border rounded-xl px-3 py-2 bg-input text-sm" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-muted-foreground">Phone Number</label>
-                  <input value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} placeholder="2557XXXXXXXX" className="w-full border border-border rounded-xl px-3 py-2 bg-input" />
+                  <input value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} placeholder="2557XXXXXXXX" className="w-full border border-border rounded-xl px-3 py-2 bg-input text-sm" />
                 </div>
                 <div className="col-span-2">
                   <label className="block text-sm font-medium text-muted-foreground">Location</label>
-                  <input value={form.location} onChange={e => setForm({ ...form, location: e.target.value })} placeholder="e.g. Dar es Salaam" className="w-full border border-border rounded-xl px-3 py-2 bg-input" />
+                  <input value={form.location} onChange={e => setForm({ ...form, location: e.target.value })} placeholder="e.g. Dar es Salaam" className="w-full border border-border rounded-xl px-3 py-2 bg-input text-sm" />
                 </div>
                 <div className="col-span-2">
                   <label className="block text-sm font-medium text-muted-foreground">Services Description</label>
-                  <textarea value={form.services} onChange={e => setForm({ ...form, services: e.target.value })} placeholder="e.g. Massage, Consultation, Delivery" rows={2} className="w-full border border-border rounded-xl px-3 py-2 bg-input" />
+                  <textarea value={form.services} onChange={e => setForm({ ...form, services: e.target.value })} placeholder="e.g. Massage, Consultation, Delivery" rows={2} className="w-full border border-border rounded-xl px-3 py-2 bg-input text-sm" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-muted-foreground">Contact Price (SQ)</label>
-                  <input type="number" value={form.contact_price} onChange={e => setForm({ ...form, contact_price: Number(e.target.value) })} placeholder="10" className="w-full border border-border rounded-xl px-3 py-2 bg-input" />
+                  <input type="number" value={form.contact_price} onChange={e => setForm({ ...form, contact_price: Number(e.target.value) })} placeholder="10" className="w-full border border-border rounded-xl px-3 py-2 bg-input text-sm" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-muted-foreground">Approved</label>
-                  <select value={form.is_approved ? "true" : "false"} onChange={e => setForm({ ...form, is_approved: e.target.value === "true" })} className="w-full border border-border rounded-xl px-3 py-2 bg-input">
+                  <select value={form.is_approved ? "true" : "false"} onChange={e => setForm({ ...form, is_approved: e.target.value === "true" })} className="w-full border border-border rounded-xl px-3 py-2 bg-input text-sm">
                     <option value="true">Yes</option><option value="false">No</option>
                   </select>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-muted-foreground">Contact Confirmed</label>
-                  <select value={form.is_confirmed ? "true" : "false"} onChange={e => setForm({ ...form, is_confirmed: e.target.value === "true" })} className="w-full border border-border rounded-xl px-3 py-2 bg-input">
+                  <select value={form.is_confirmed ? "true" : "false"} onChange={e => setForm({ ...form, is_confirmed: e.target.value === "true" })} className="w-full border border-border rounded-xl px-3 py-2 bg-input text-sm">
                     <option value="true">Yes</option><option value="false">No</option>
                   </select>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-muted-foreground">Service Prices (JSON)</label>
-                  <input value={form.service_prices} onChange={e => setForm({ ...form, service_prices: e.target.value })} placeholder='{"massage": 10, "consultation": 5}' className="w-full border border-border rounded-xl px-3 py-2 bg-input font-mono" />
+                  <input value={form.service_prices} onChange={e => setForm({ ...form, service_prices: e.target.value })} placeholder='{"massage": 10, "consultation": 5}' className="w-full border border-border rounded-xl px-3 py-2 bg-input text-sm font-mono" />
                 </div>
               </div>
               <div className="flex gap-3 pt-2">
-                <button type="submit" className="bg-primary text-primary-foreground px-6 py-2.5 rounded-xl font-semibold shadow-[var(--shadow-neon)] hover:opacity-90 transition">
+                <button type="submit" className="bg-primary text-primary-foreground px-6 py-2 rounded-xl font-semibold shadow-[var(--shadow-neon)] hover:opacity-90 transition text-sm">
                   <i className="fas fa-save mr-1"></i> Save Changes
                 </button>
-                <button type="button" onClick={closeEditModal} className="border border-border px-6 py-2.5 rounded-xl hover:bg-muted transition">
+                <button type="button" onClick={closeEditModal} className="border border-border px-6 py-2 rounded-xl hover:bg-muted transition text-sm">
                   Cancel
                 </button>
               </div>
@@ -794,7 +912,7 @@ function BusinessContent() {
 }
 
 // ============================================================
-// STORIES
+// STORIES (compact)
 // ============================================================
 function StoriesContent() {
   const [stories, setStories] = useState([]);
@@ -820,29 +938,29 @@ function StoriesContent() {
   if (loading) return <Loading />;
   return (
     <div>
-      <h2 className="text-2xl font-black mb-6">Stories</h2>
+      <h2 className="text-xl font-bold mb-6">Stories</h2>
       <div className="bg-card rounded-2xl shadow-sm border border-border overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-muted/50">
               <tr>
-                <th className="px-5 py-3 text-left text-xs font-medium text-muted-foreground uppercase">User</th>
-                <th className="px-5 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Status</th>
-                <th className="px-5 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Expires</th>
-                <th className="px-5 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Actions</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">User</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Status</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Expires</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
               {stories.map(s => (
                 <tr key={s.id} className="hover:bg-muted/30 transition">
-                  <td className="px-5 py-3">{s.profiles?.full_name || "—"}</td>
-                  <td className="px-5 py-3">
-                    <span className={`px-3 py-1 rounded-full text-xs font-semibold ${s.status === "approved" ? "bg-green-100 text-green-700" : s.status === "rejected" ? "bg-red-100 text-red-700" : "bg-yellow-100 text-yellow-700"}`}>
+                  <td className="px-4 py-2">{s.profiles?.full_name || "—"}</td>
+                  <td className="px-4 py-2">
+                    <span className={`px-2 py-1 rounded-full text-xs font-semibold ${s.status === "approved" ? "bg-green-100 text-green-700" : s.status === "rejected" ? "bg-red-100 text-red-700" : "bg-yellow-100 text-yellow-700"}`}>
                       {s.status}
                     </span>
                   </td>
-                  <td className="px-5 py-3">{s.expires_at ? new Date(s.expires_at).toLocaleDateString() : "—"}</td>
-                  <td className="px-5 py-3 flex gap-2">
+                  <td className="px-4 py-2">{s.expires_at ? new Date(s.expires_at).toLocaleDateString() : "—"}</td>
+                  <td className="px-4 py-2 flex gap-2">
                     {s.status !== "approved" && <button onClick={() => updateStatus(s.id, "approved")} className="text-green-500 hover:opacity-80"><i className="fas fa-check"></i></button>}
                     {s.status !== "rejected" && <button onClick={() => updateStatus(s.id, "rejected")} className="text-red-500 hover:opacity-80"><i className="fas fa-times"></i></button>}
                     <button onClick={() => deleteStory(s.id)} className="text-destructive/70 hover:text-destructive"><i className="fas fa-trash-alt"></i></button>
@@ -858,7 +976,7 @@ function StoriesContent() {
 }
 
 // ============================================================
-// REDEEM
+// REDEEM (compact)
 // ============================================================
 function RedeemContent() {
   const [links, setLinks] = useState([]);
@@ -900,26 +1018,23 @@ function RedeemContent() {
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-black">Redeem Links</h2>
-        <button
-          onClick={() => setShowForm(true)}
-          className="bg-primary text-primary-foreground px-5 py-2.5 rounded-xl font-semibold shadow-[var(--shadow-neon)] hover:opacity-90 transition flex items-center gap-2"
-        >
+        <h2 className="text-xl font-bold">Redeem Links</h2>
+        <button onClick={() => setShowForm(true)} className="bg-primary text-primary-foreground px-4 py-2 rounded-xl font-semibold shadow-[var(--shadow-neon)] hover:opacity-90 transition flex items-center gap-2 text-sm">
           <i className="fas fa-plus"></i> Create Link
         </button>
       </div>
       {showForm && (
         <div className="bg-card p-6 rounded-2xl shadow-sm border border-border mb-6">
           <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <input value={form.code} onChange={e => setForm({ ...form, code: e.target.value })} placeholder="Code (leave blank to auto-generate)" className="border border-border rounded-xl px-4 py-2.5 bg-input" />
-            <input type="number" value={form.coins} onChange={e => setForm({ ...form, coins: Number(e.target.value) })} placeholder="Coins" className="border border-border rounded-xl px-4 py-2.5 bg-input" required />
-            <input type="number" value={form.max_uses} onChange={e => setForm({ ...form, max_uses: Number(e.target.value) })} placeholder="Max uses" className="border border-border rounded-xl px-4 py-2.5 bg-input" required />
-            <input type="datetime-local" value={form.expires_at} onChange={e => setForm({ ...form, expires_at: e.target.value })} className="border border-border rounded-xl px-4 py-2.5 bg-input" required />
+            <input value={form.code} onChange={e => setForm({ ...form, code: e.target.value })} placeholder="Code (leave blank to auto-generate)" className="border border-border rounded-xl px-4 py-2 bg-input text-sm" />
+            <input type="number" value={form.coins} onChange={e => setForm({ ...form, coins: Number(e.target.value) })} placeholder="Coins" className="border border-border rounded-xl px-4 py-2 bg-input text-sm" required />
+            <input type="number" value={form.max_uses} onChange={e => setForm({ ...form, max_uses: Number(e.target.value) })} placeholder="Max uses" className="border border-border rounded-xl px-4 py-2 bg-input text-sm" required />
+            <input type="datetime-local" value={form.expires_at} onChange={e => setForm({ ...form, expires_at: e.target.value })} className="border border-border rounded-xl px-4 py-2 bg-input text-sm" required />
             <div className="flex gap-3 md:col-span-2">
-              <button type="submit" className="bg-primary text-primary-foreground px-6 py-2.5 rounded-xl font-semibold shadow-[var(--shadow-neon)] hover:opacity-90 transition">
+              <button type="submit" className="bg-primary text-primary-foreground px-6 py-2 rounded-xl font-semibold shadow-[var(--shadow-neon)] hover:opacity-90 transition text-sm">
                 Save
               </button>
-              <button type="button" onClick={() => setShowForm(false)} className="border border-border px-6 py-2.5 rounded-xl hover:bg-muted transition">
+              <button type="button" onClick={() => setShowForm(false)} className="border border-border px-6 py-2 rounded-xl hover:bg-muted transition text-sm">
                 Cancel
               </button>
             </div>
@@ -931,21 +1046,21 @@ function RedeemContent() {
           <table className="w-full text-sm">
             <thead className="bg-muted/50">
               <tr>
-                <th className="px-5 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Code</th>
-                <th className="px-5 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Coins</th>
-                <th className="px-5 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Used / Max</th>
-                <th className="px-5 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Expires</th>
-                <th className="px-5 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Actions</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Code</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Coins</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Used / Max</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Expires</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
               {links.map(l => (
                 <tr key={l.id} className="hover:bg-muted/30 transition">
-                  <td className="px-5 py-3 font-mono text-xs">{l.code}</td>
-                  <td className="px-5 py-3">{l.coins}</td>
-                  <td className="px-5 py-3">{l.used || 0} / {l.max_uses}</td>
-                  <td className="px-5 py-3">{l.expires_at ? new Date(l.expires_at).toLocaleDateString() : "—"}</td>
-                  <td className="px-5 py-3">
+                  <td className="px-4 py-2 font-mono text-xs">{l.code}</td>
+                  <td className="px-4 py-2">{l.coins}</td>
+                  <td className="px-4 py-2">{l.used || 0} / {l.max_uses}</td>
+                  <td className="px-4 py-2">{l.expires_at ? new Date(l.expires_at).toLocaleDateString() : "—"}</td>
+                  <td className="px-4 py-2">
                     <button onClick={() => deleteLink(l.id)} className="text-destructive/70 hover:text-destructive transition">
                       <i className="fas fa-trash-alt"></i>
                     </button>
@@ -961,7 +1076,7 @@ function RedeemContent() {
 }
 
 // ============================================================
-// SETTINGS
+// SETTINGS (compact)
 // ============================================================
 function SettingsContent() {
   const [settings, setSettings] = useState({});
@@ -983,23 +1098,23 @@ function SettingsContent() {
   if (loading) return <Loading />;
   return (
     <div>
-      <h2 className="text-2xl font-black mb-6">App Settings</h2>
+      <h2 className="text-xl font-bold mb-6">App Settings</h2>
       <div className="bg-card p-6 rounded-2xl shadow-sm border border-border space-y-4">
         <div>
           <label className="block text-sm font-medium text-muted-foreground">SQ to TSh Rate</label>
-          <input type="number" value={settings.sq_to_tsh || "100"} onChange={e => updateSetting("sq_to_tsh", e.target.value)} className="border border-border rounded-xl px-4 py-2.5 bg-input w-48" />
+          <input type="number" value={settings.sq_to_tsh || "100"} onChange={e => updateSetting("sq_to_tsh", e.target.value)} className="border border-border rounded-xl px-4 py-2 bg-input text-sm w-48" />
         </div>
         <div>
           <label className="block text-sm font-medium text-muted-foreground">Support WhatsApp Number</label>
-          <input type="text" value={settings.support_whatsapp || ""} onChange={e => updateSetting("support_whatsapp", e.target.value)} className="border border-border rounded-xl px-4 py-2.5 bg-input w-full" />
+          <input type="text" value={settings.support_whatsapp || ""} onChange={e => updateSetting("support_whatsapp", e.target.value)} className="border border-border rounded-xl px-4 py-2 bg-input text-sm w-full" />
         </div>
         <div>
           <label className="block text-sm font-medium text-muted-foreground">WhatsApp Channel Link</label>
-          <input type="text" value={settings.whatsapp_channel || ""} onChange={e => updateSetting("whatsapp_channel", e.target.value)} className="border border-border rounded-xl px-4 py-2.5 bg-input w-full" />
+          <input type="text" value={settings.whatsapp_channel || ""} onChange={e => updateSetting("whatsapp_channel", e.target.value)} className="border border-border rounded-xl px-4 py-2 bg-input text-sm w-full" />
         </div>
         <div>
           <label className="block text-sm font-medium text-muted-foreground">Support Email</label>
-          <input type="email" value={settings.support_email || ""} onChange={e => updateSetting("support_email", e.target.value)} className="border border-border rounded-xl px-4 py-2.5 bg-input w-full" />
+          <input type="email" value={settings.support_email || ""} onChange={e => updateSetting("support_email", e.target.value)} className="border border-border rounded-xl px-4 py-2 bg-input text-sm w-full" />
         </div>
       </div>
     </div>
