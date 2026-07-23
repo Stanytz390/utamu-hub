@@ -1,20 +1,19 @@
-import { createClient } from '@supabase/supabase-js';
-import type { Database } from './types';
+// ... other imports
 
-// Try both possible names
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseKey =
-  import.meta.env.VITE_SUPABASE_KEY ||
-  import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+export const requireSupabaseAuth = createMiddleware({ type: 'function' }).server(
+  async ({ next }) => {
+    // Use process.env, but fall back to VITE_ variants for compatibility
+    const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+    const SUPABASE_PUBLISHABLE_KEY =
+      process.env.SUPABASE_PUBLISHABLE_KEY ||
+      process.env.SUPABASE_KEY ||
+      process.env.VITE_SUPABASE_KEY ||
+      process.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
-if (!supabaseUrl || !supabaseKey) {
-  throw new Error('Missing Supabase environment variables');
-}
+    if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
+      throw new Error('Missing Supabase environment variables on server');
+    }
 
-export const supabase = createClient<Database>(supabaseUrl, supabaseKey, {
-  auth: {
-    storage: typeof window !== 'undefined' ? localStorage : undefined,
-    persistSession: true,
-    autoRefreshToken: true,
-  },
-});
+    // ... rest of your middleware
+  }
+);
