@@ -27,7 +27,7 @@ function AuthPage() {
   const [err, setErr] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
 
-  // Check for existing session on load
+  // Check existing session
   useEffect(() => {
     const checkSession = async () => {
       const { data } = await supabase.auth.getSession();
@@ -41,7 +41,6 @@ function AuthPage() {
   // Handle magic link callback
   useEffect(() => {
     if (magic === "true") {
-      // The session is automatically set by Supabase; we just need to redirect
       const check = async () => {
         const { data } = await supabase.auth.getSession();
         if (data.session) {
@@ -71,7 +70,7 @@ function AuthPage() {
     }
   };
 
-  // Sign up with email + password (sends magic link for confirmation)
+  // Sign up with email + password (sends confirmation email)
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     setErr(null);
@@ -99,7 +98,7 @@ function AuthPage() {
     }
   };
 
-  // Send magic link (passwordless)
+  // Magic link (passwordless)
   const handleMagicLink = async (e: React.FormEvent) => {
     e.preventDefault();
     setErr(null);
@@ -157,7 +156,6 @@ function AuthPage() {
         </p>
       </div>
 
-      {/* GitHub Button */}
       <button
         onClick={handleGitHub}
         className="mb-4 flex w-full items-center justify-center gap-2 rounded-xl border border-border bg-card py-3 font-semibold text-foreground hover:bg-muted"
