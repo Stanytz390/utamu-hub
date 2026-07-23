@@ -1,11 +1,165 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { createServerFn } from "@tanstack/start";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { useEffect, useState } from "react";
 
 const ADMIN_PASSWORD = "STANY#MINES";
 
 // ============================================================
-// ROUTE – Client-side only
+// 1. Server Functions (use supabaseAdmin – bypass RLS)
+// ============================================================
+
+// Fetch stats
+export const fetchStatsFn = createServerFn({
+  type: "query",
+  handler: async () => {
+    const { count: users } = await supabaseAdmin.from("profiles").select("*", { count: "exact", head: true });
+    const { count: videos } = await supabaseAdmin.from("videos").select("*", { count: "exact", head: true });
+    const { count: groups } = await supabaseAdmin.from("groups").select("*", { count: "exact", head: true });
+    const { count: dadaz } = await supabaseAdmin.from("dadaz_profiles").select("*", { count: "exact", head: true });
+    return { users: users || 0, videos: videos || 0, groups: groups || 0, dadaz: dadaz || 0 };
+  },
+});
+
+// Videos CRUD
+export const getVideosFn = createServerFn({
+  type: "query",
+  handler: async () => {
+    const { data } = await supabaseAdmin.from("videos").select("*, categories(id, name)").order("created_at", { ascending: false });
+    return data || [];
+  },
+});
+
+export const addVideoFn = createServerFn({
+  type: "mutation",
+  handler: async (payload: any) => {
+    const { error } = await supabaseAdmin.from("videos").insert([payload]);
+    if (error) throw new Error(error.message);
+    return { success: true };
+  },
+});
+
+export const deleteVideoFn = createServerFn({
+  type: "mutation",
+  handler: async (id: string) => {
+    const { error } = await supabaseAdmin.from("videos").delete().eq("id", id);
+    if (error) throw new Error(error.message);
+    return { success: true };
+  },
+});
+
+// Groups CRUD
+export const getGroupsFn = createServerFn({
+  type: "query",
+  handler: async () => {
+    const { data } = await supabaseAdmin.from("groups").select("*").order("created_at", { ascending: false });
+    return data || [];
+  },
+});
+
+export const addGroupFn = createServerFn({
+  type: "mutation",
+  handler: async (payload: any) => {
+    const { error } = await supabaseAdmin.from("groups").insert([payload]);
+    if (error) throw new Error(error.message);
+    return { success: true };
+  },
+});
+
+export const deleteGroupFn = createServerFn({
+  type: "mutation",
+  handler: async (id: string) => {
+    const { error } = await supabaseAdmin.from("groups").delete().eq("id", id);
+    if (error) throw new Error(error.message);
+    return { success: true };
+  },
+});
+
+// Dadaz CRUD
+export const getDadazFn = createServerFn({
+  type: "query",
+  handler: async () => {
+    const { data } = await supabaseAdmin.from("dadaz_profiles").select("*").order("created_at", { ascending: false });
+    return data || [];
+  },
+});
+
+export const toggleDadazApprovalFn = createServerFn({
+  type: "mutation",
+  handler: async ({ id, current }: { id: string; current: boolean }) => {
+    const { error } = await supabaseAdmin.from("dadaz_profiles").update({ is_admin_approved: !current }).eq("id", id);
+    if (error) throw new Error(error.message);
+    return { success: true };
+  },
+});
+
+export const deleteDadazFn = createServerFn({
+  type: "mutation",
+  handler: async (id: string) => {
+    const { error } = await supabaseAdmin.from("dadaz_profiles").delete().eq("id", id);
+    if (error) throw new Error(error.message);
+    return { success: true };
+  },
+});
+
+// Redeem CRUD
+export const getRedeemFn = createServerFn({
+  type: "query",
+  handler: async () => {
+    const { data } = await supabaseAdmin.from("redeem_links").select("*").order("created_at", { ascending: false });
+    return data || [];
+  },
+});
+
+export const addRedeemFn = createServerFn({
+  type: "mutation",
+  handler: async (payload: any) => {
+    const { error } = await supabaseAdmin.from("redeem_links").insert([payload]);
+    if (error) throw new Error(error.message);
+    return { success: true };
+  },
+});
+
+export const deleteRedeemFn = createServerFn({
+  type: "mutation",
+  handler: async (id: string) => {
+    const { error } = await supabaseAdmin.from("redeem_links").delete().eq("id", id);
+    if (error) throw new Error(error.message);
+    return { success: true };
+  },
+});
+
+// Settings
+export const getSettingsFn = createServerFn({
+  type: "query",
+  handler: async () => {
+    const { data } = await supabaseAdmin.from("app_settings").select("*");
+    const settings: Record<string, string> = {};
+    data?.forEach((item) => (settings[item.key] = item.value));
+    return settings;
+  },
+});
+
+export const updateSettingFn = createServerFn({
+  type: "mutation",
+  handler: async ({ key, value }: { key: string; value: any }) => {
+    const { error } = await supabaseAdmin.from("app_settings").upsert({ key, value });
+    if (error) throw new Error(error.message);
+    return { success: true };
+  },
+});
+
+// Categories (for dropdown)
+export const getCategoriesFn = createServerFn({
+  type: "query",
+  handler: async () => {
+    const { data } = await supabaseAdmin.from("categories").select("id, name").order("created_at");
+    return data || [];
+  },
+});
+
+// ============================================================
+// 2. ROUTE – Client-side only
 // ============================================================
 export const Route = createFileRoute("/admin")({
   ssr: false,
@@ -13,7 +167,7 @@ export const Route = createFileRoute("/admin")({
 });
 
 // ============================================================
-// MAIN ADMIN COMPONENT
+// 3. ADMIN DASHBOARD (Client-side UI)
 // ============================================================
 function AdminDashboard() {
   const navigate = useNavigate();
@@ -34,11 +188,8 @@ function AdminDashboard() {
   const fetchStats = async () => {
     try {
       setLoadingStats(true);
-      const { count: u } = await supabaseAdmin.from("profiles").select("*", { count: "exact", head: true });
-      const { count: v } = await supabaseAdmin.from("videos").select("*", { count: "exact", head: true });
-      const { count: g } = await supabaseAdmin.from("groups").select("*", { count: "exact", head: true });
-      const { count: d } = await supabaseAdmin.from("dadaz_profiles").select("*", { count: "exact", head: true });
-      setStats({ users: u || 0, videos: v || 0, groups: g || 0, dadaz: d || 0 });
+      const result = await fetchStatsFn();
+      setStats(result);
     } catch (e) {
       console.error("Stats error:", e);
     } finally {
@@ -184,8 +335,9 @@ function AdminDashboard() {
 }
 
 // ============================================================
-// 1. DASHBOARD
+// 4. UI Components (using server functions for data)
 // ============================================================
+
 function DashboardContent({ stats }: { stats: any }) {
   const cards = [
     { label: "Total Users", value: stats.users, icon: "fa-users", color: "text-blue-400" },
@@ -206,9 +358,6 @@ function DashboardContent({ stats }: { stats: any }) {
   );
 }
 
-// ============================================================
-// 2. MANAGE VIDEOS – using correct column names
-// ============================================================
 function VideosContent() {
   const [vids, setVids] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -221,35 +370,32 @@ function VideosContent() {
     category_id: "",
     status: "available",
     duration: "",
-    creator_id: "",
   });
   const [categories, setCategories] = useState<any[]>([]);
 
-  const fetchVids = async () => {
+  const fetchData = async () => {
     try {
       setLoading(true);
-      const { data } = await supabaseAdmin
-        .from("videos")
-        .select("*, categories(id, name)")
-        .order("created_at", { ascending: false });
-      setVids(data || []);
-    } catch (e) { console.error("Fetch videos error:", e); }
-    finally { setLoading(false); }
+      const [videosData, categoriesData] = await Promise.all([
+        getVideosFn(),
+        getCategoriesFn(),
+      ]);
+      setVids(videosData);
+      setCategories(categoriesData);
+    } catch (e) {
+      console.error("Fetch error:", e);
+      alert("Failed to load data");
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const fetchCategories = async () => {
-    try {
-      const { data } = await supabaseAdmin.from("categories").select("id, name").order("created_at");
-      setCategories(data || []);
-    } catch (e) { console.error("Fetch categories error:", e); }
-  };
-
-  useEffect(() => { fetchVids(); fetchCategories(); }, []);
+  useEffect(() => { fetchData(); }, []);
 
   const save = async (e: any) => {
     e.preventDefault();
     try {
-      const payload: any = {
+      const payload = {
         title: form.title,
         video_url: form.video_url,
         thumbnail: form.thumbnail || null,
@@ -258,10 +404,8 @@ function VideosContent() {
         is_published: true,
         category_id: form.category_id || null,
         duration: form.duration || null,
-        creator_id: form.creator_id || null,
       };
-      const { error } = await supabaseAdmin.from("videos").insert([payload]);
-      if (error) throw error;
+      await addVideoFn({ data: payload });
       alert("Video Added!");
       setShowAdd(false);
       setForm({
@@ -272,22 +416,22 @@ function VideosContent() {
         category_id: "",
         status: "available",
         duration: "",
-        creator_id: "",
       });
-      fetchVids();
+      fetchData();
     } catch (err: any) {
       alert("Error: " + err.message);
-      console.error("Save video error:", err);
     }
   };
 
   const deleteVideo = async (id: string) => {
     if (!confirm("Delete this video?")) return;
     try {
-      await supabaseAdmin.from("videos").delete().eq("id", id);
+      await deleteVideoFn({ data: id });
       alert("Video deleted");
-      fetchVids();
-    } catch (err: any) { alert("Error: " + err.message); }
+      fetchData();
+    } catch (err: any) {
+      alert("Error: " + err.message);
+    }
   };
 
   if (loading) return <div className="flex justify-center items-center h-40"><i className="fas fa-spinner fa-spin text-2xl text-primary"></i></div>;
@@ -305,7 +449,6 @@ function VideosContent() {
           <input placeholder="Thumbnail URL (optional)" className="w-full bg-black/50 border border-white/10 p-4 rounded-2xl text-sm" onChange={e => setForm({...form, thumbnail: e.target.value})} />
           <input type="number" placeholder="Price SQ (0 for Free)" className="w-full bg-black/50 border border-white/10 p-4 rounded-2xl text-sm" onChange={e => setForm({...form, price_sq: Number(e.target.value)})} />
           <input placeholder="Duration (e.g. 3:45)" className="w-full bg-black/50 border border-white/10 p-4 rounded-2xl text-sm" onChange={e => setForm({...form, duration: e.target.value})} />
-          <input placeholder="Creator ID (optional)" className="w-full bg-black/50 border border-white/10 p-4 rounded-2xl text-sm" onChange={e => setForm({...form, creator_id: e.target.value})} />
           <select className="w-full bg-black/50 border border-white/10 p-4 rounded-2xl text-sm" value={form.category_id} onChange={e => setForm({...form, category_id: e.target.value})}>
             <option value="">Select Category</option>
             {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
@@ -342,39 +485,44 @@ function VideosContent() {
   );
 }
 
-// ============================================================
-// 3. MANAGE DADAZ
-// ============================================================
 function DadazContent() {
   const [dadaz, setDadaz] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const fetchDadaz = async () => {
+  const fetchData = async () => {
     try {
       setLoading(true);
-      const { data } = await supabaseAdmin.from("dadaz_profiles").select("*").order("created_at", { ascending: false });
-      setDadaz(data || []);
-    } catch (e) { console.error("Fetch dadaz error:", e); }
-    finally { setLoading(false); }
+      const data = await getDadazFn();
+      setDadaz(data);
+    } catch (e) {
+      console.error("Fetch error:", e);
+      alert("Failed to load dadaz");
+    } finally {
+      setLoading(false);
+    }
   };
 
-  useEffect(() => { fetchDadaz(); }, []);
+  useEffect(() => { fetchData(); }, []);
 
   const toggleApproval = async (id: string, current: boolean) => {
     try {
-      await supabaseAdmin.from("dadaz_profiles").update({ is_admin_approved: !current }).eq("id", id);
+      await toggleDadazApprovalFn({ data: { id, current } });
       alert(!current ? "Approved!" : "Unapproved");
-      fetchDadaz();
-    } catch (err: any) { alert("Error: " + err.message); }
+      fetchData();
+    } catch (err: any) {
+      alert("Error: " + err.message);
+    }
   };
 
   const deleteDadaz = async (id: string) => {
     if (!confirm("Delete this profile?")) return;
     try {
-      await supabaseAdmin.from("dadaz_profiles").delete().eq("id", id);
+      await deleteDadazFn({ data: id });
       alert("Deleted");
-      fetchDadaz();
-    } catch (err: any) { alert("Error: " + err.message); }
+      fetchData();
+    } catch (err: any) {
+      alert("Error: " + err.message);
+    }
   };
 
   if (loading) return <div className="flex justify-center items-center h-40"><i className="fas fa-spinner fa-spin text-2xl text-primary"></i></div>;
@@ -411,25 +559,26 @@ function DadazContent() {
   );
 }
 
-// ============================================================
-// 4. MANAGE GROUPS – with price_sq
-// ============================================================
 function GroupsContent() {
   const [groups, setGroups] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
   const [form, setForm] = useState({ name: "", link: "", description: "", logo_url: "", price_sq: 0 });
 
-  const fetchGroups = async () => {
+  const fetchData = async () => {
     try {
       setLoading(true);
-      const { data } = await supabaseAdmin.from("groups").select("*").order("created_at", { ascending: false });
-      setGroups(data || []);
-    } catch (e) { console.error("Fetch groups error:", e); }
-    finally { setLoading(false); }
+      const data = await getGroupsFn();
+      setGroups(data);
+    } catch (e) {
+      console.error("Fetch error:", e);
+      alert("Failed to load groups");
+    } finally {
+      setLoading(false);
+    }
   };
 
-  useEffect(() => { fetchGroups(); }, []);
+  useEffect(() => { fetchData(); }, []);
 
   const save = async (e: any) => {
     e.preventDefault();
@@ -442,25 +591,25 @@ function GroupsContent() {
         price_sq: Number(form.price_sq),
         is_published: true,
       };
-      const { error } = await supabaseAdmin.from("groups").insert([payload]);
-      if (error) throw error;
+      await addGroupFn({ data: payload });
       alert("Group Added!");
       setShowAdd(false);
       setForm({ name: "", link: "", description: "", logo_url: "", price_sq: 0 });
-      fetchGroups();
+      fetchData();
     } catch (err: any) {
       alert("Error: " + err.message);
-      console.error("Save group error:", err);
     }
   };
 
   const deleteGroup = async (id: string) => {
     if (!confirm("Delete this group?")) return;
     try {
-      await supabaseAdmin.from("groups").delete().eq("id", id);
+      await deleteGroupFn({ data: id });
       alert("Deleted");
-      fetchGroups();
-    } catch (err: any) { alert("Error: " + err.message); }
+      fetchData();
+    } catch (err: any) {
+      alert("Error: " + err.message);
+    }
   };
 
   if (loading) return <div className="flex justify-center items-center h-40"><i className="fas fa-spinner fa-spin text-2xl text-primary"></i></div>;
@@ -498,25 +647,26 @@ function GroupsContent() {
   );
 }
 
-// ============================================================
-// 5. REDEEM CODES – uses correct columns
-// ============================================================
 function RedeemContent() {
   const [codes, setCodes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [amt, setAmt] = useState(10);
   const [uses, setUses] = useState(1);
 
-  const fetchCodes = async () => {
+  const fetchData = async () => {
     try {
       setLoading(true);
-      const { data } = await supabaseAdmin.from("redeem_links").select("*").order("created_at", { ascending: false });
-      setCodes(data || []);
-    } catch (e) { console.error("Fetch codes error:", e); }
-    finally { setLoading(false); }
+      const data = await getRedeemFn();
+      setCodes(data);
+    } catch (e) {
+      console.error("Fetch error:", e);
+      alert("Failed to load redeem codes");
+    } finally {
+      setLoading(false);
+    }
   };
 
-  useEffect(() => { fetchCodes(); }, []);
+  useEffect(() => { fetchData(); }, []);
 
   const generate = async () => {
     try {
@@ -529,23 +679,23 @@ function RedeemContent() {
         used: 0,
         uses_count: 0,
       };
-      const { error } = await supabaseAdmin.from("redeem_links").insert([payload]);
-      if (error) throw error;
+      await addRedeemFn({ data: payload });
       alert("Code Created!");
-      fetchCodes();
+      fetchData();
     } catch (err: any) {
       alert("Error: " + err.message);
-      console.error("Generate code error:", err);
     }
   };
 
   const deleteCode = async (id: string) => {
     if (!confirm("Delete this code?")) return;
     try {
-      await supabaseAdmin.from("redeem_links").delete().eq("id", id);
+      await deleteRedeemFn({ data: id });
       alert("Deleted");
-      fetchCodes();
-    } catch (err: any) { alert("Error: " + err.message); }
+      fetchData();
+    } catch (err: any) {
+      alert("Error: " + err.message);
+    }
   };
 
   if (loading) return <div className="flex justify-center items-center h-40"><i className="fas fa-spinner fa-spin text-2xl text-primary"></i></div>;
@@ -590,33 +740,33 @@ function RedeemContent() {
   );
 }
 
-// ============================================================
-// 6. APP SETTINGS
-// ============================================================
 function SettingsContent() {
   const [settings, setSettings] = useState<any>({});
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const fetch = async () => {
-      try {
-        setLoading(true);
-        const { data } = await supabaseAdmin.from("app_settings").select("*");
-        const s: any = {};
-        data?.forEach(item => s[item.key] = item.value);
-        setSettings(s);
-      } catch (e) { console.error("Fetch settings error:", e); }
-      finally { setLoading(false); }
-    };
-    fetch();
-  }, []);
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      const data = await getSettingsFn();
+      setSettings(data);
+    } catch (e) {
+      console.error("Fetch error:", e);
+      alert("Failed to load settings");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { fetchData(); }, []);
 
   const save = async (key: string, value: any) => {
     try {
-      const { error } = await supabaseAdmin.from("app_settings").upsert({ key, value });
-      if (error) throw error;
+      await updateSettingFn({ data: { key, value } });
       alert(`Updated ${key}!`);
-    } catch (err: any) { alert("Error: " + err.message); }
+      fetchData();
+    } catch (err: any) {
+      alert("Error: " + err.message);
+    }
   };
 
   if (loading) return <div className="flex justify-center items-center h-40"><i className="fas fa-spinner fa-spin text-2xl text-primary"></i></div>;
