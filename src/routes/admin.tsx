@@ -1,12 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { 
-  LayoutDashboard, Video, Users, UserCheck, 
-  Gift, Settings, Plus, Trash2, Edit, 
-  Menu, X, CheckCircle, Clock, ExternalLink,
-  ChevronRight, Save, Phone, Coins
-} from "lucide-react";
 import { toast, Toaster } from "sonner";
 
 // ============================================================
@@ -39,12 +33,12 @@ function AdminDashboard() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   const menuItems = [
-    { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
-    { id: "videos", label: "Utamu Videos", icon: Video },
-    { id: "dadaz", label: "Manage Dadaz", icon: UserCheck },
-    { id: "groups", label: "Manage Groups", icon: Users },
-    { id: "redeem", label: "Redeem Codes", icon: Gift },
-    { id: "settings", label: "App Settings", icon: Settings },
+    { id: "dashboard", label: "Dashboard", icon: "fa-chart-line" },
+    { id: "videos", label: "Utamu Videos", icon: "fa-video" },
+    { id: "dadaz", label: "Manage Dadaz", icon: "fa-user-check" },
+    { id: "groups", label: "Manage Groups", icon: "fa-users" },
+    { id: "redeem", label: "Redeem Codes", icon: "fa-gift" },
+    { id: "settings", label: "App Settings", icon: "fa-cog" },
   ];
 
   const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
@@ -57,11 +51,13 @@ function AdminDashboard() {
       <div className="md:hidden fixed top-0 left-0 right-0 z-50 bg-[#111] border-b border-white/5 p-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <button onClick={toggleSidebar} className="p-2 bg-white/5 rounded-lg text-primary">
-            {isSidebarOpen ? <X size={20} /> : <Menu size={20} />}
+            <i className={`fas ${isSidebarOpen ? "fa-times" : "fa-bars"} text-lg`}></i>
           </button>
           <span className="font-black italic text-sm tracking-tighter uppercase">Admin Panel</span>
         </div>
-        <button onClick={() => navigate({ to: "/" })} className="text-xs font-bold text-muted-foreground">Exit</button>
+        <button onClick={() => navigate({ to: "/" })} className="text-xs font-bold text-muted-foreground">
+          <i className="fas fa-times"></i>
+        </button>
       </div>
 
       {/* Sidebar Overlay (Mobile) */}
@@ -88,16 +84,19 @@ function AdminDashboard() {
                 ${activeTab === item.id ? "bg-primary text-white shadow-[0_0_20px_rgba(254,44,85,0.3)]" : "text-muted-foreground hover:bg-white/5"}
               `}
             >
-              <item.icon size={18} />
+              <i className={`fas ${item.icon} text-lg`}></i>
               {item.label}
             </button>
           ))}
         </nav>
 
         <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-white/5">
-           <button onClick={() => supabase.auth.signOut().then(() => navigate({to: '/auth'}))} className="flex items-center gap-3 w-full px-4 py-3 text-sm font-bold text-red-400 hover:bg-red-500/10 rounded-2xl transition-all">
-             <X size={18} /> Logout
-           </button>
+          <button 
+            onClick={() => supabase.auth.signOut().then(() => navigate({to: '/auth'}))} 
+            className="flex items-center gap-3 w-full px-4 py-3 text-sm font-bold text-red-400 hover:bg-red-500/10 rounded-2xl transition-all"
+          >
+            <i className="fas fa-sign-out-alt"></i> Logout
+          </button>
         </div>
       </aside>
 
@@ -105,7 +104,7 @@ function AdminDashboard() {
       <main className="flex-1 w-full p-4 md:p-10 mt-16 md:mt-0 overflow-x-hidden">
         <header className="mb-8 hidden md:block">
           <h2 className="text-3xl font-black">{menuItems.find(m => m.id === activeTab)?.label}</h2>
-          <p className="text-muted-foreground text-sm">Welcome back, Boss Stanlee.</p>
+          <p className="text-muted-foreground text-sm">Welcome back, Admin.</p>
         </header>
 
         <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -139,17 +138,17 @@ function DashboardContent() {
   }, []);
 
   const cards = [
-    { label: "Users", value: stats.users, icon: Users, color: "text-blue-400" },
-    { label: "Videos", value: stats.vids, icon: Video, color: "text-primary" },
-    { label: "Groups", value: stats.groups, icon: ExternalLink, color: "text-secondary" },
-    { label: "Dadaz", value: stats.dadaz, icon: UserCheck, color: "text-purple-400" },
+    { label: "Users", value: stats.users, icon: "fa-users", color: "text-blue-400" },
+    { label: "Videos", value: stats.vids, icon: "fa-video", color: "text-primary" },
+    { label: "Groups", value: stats.groups, icon: "fa-users", color: "text-secondary" },
+    { label: "Dadaz", value: stats.dadaz, icon: "fa-user-check", color: "text-purple-400" },
   ];
 
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-6">
       {cards.map((c, i) => (
         <div key={i} className="bg-[#111] p-5 rounded-3xl border border-white/5 shadow-xl">
-          <c.icon className={`${c.color} mb-3`} size={24} />
+          <i className={`fas ${c.icon} ${c.color} text-2xl mb-3`}></i>
           <p className="text-2xl font-black">{c.value}</p>
           <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">{c.label}</p>
         </div>
@@ -164,25 +163,42 @@ function DashboardContent() {
 function VideosContent() {
   const [vids, setVids] = useState<any[]>([]);
   const [showAdd, setShowAdd] = useState(false);
-  const [form, setForm] = useState({ title: "", video_url: "", thumbnail_url: "", price_sq: 0 });
+  const [form, setForm] = useState({ title: "", video_url: "", thumbnail_url: "", price_sq: 0, category_slug: "", creator: "", duration: "" });
 
   const fetchVids = async () => {
-    const { data } = await supabase.from("videos").select("*").order("created_at", { ascending: false });
+    const { data } = await supabase.from("videos").select("*, categories!video_category_id_fkey (slug, label)").order("created_at", { ascending: false });
     setVids(data || []);
   };
   useEffect(() => { fetchVids(); }, []);
 
   const save = async (e: any) => {
     e.preventDefault();
-    const { error } = await supabase.from("videos").insert([{ ...form, status: "available", price_tsh: form.price_sq * 100 }]);
+    const payload = {
+      title: form.title,
+      video_url: form.video_url,
+      thumbnail_url: form.thumbnail_url || null,
+      price_tsh: form.price_sq * 100,
+      is_published: true,
+      category_slug: form.category_slug || null,
+      creator: form.creator || null,
+      duration: form.duration || null,
+    };
+    const { error } = await supabase.from("videos").insert([payload]);
     if (error) toast.error(error.message);
     else { toast.success("Video Added!"); setShowAdd(false); fetchVids(); }
+  };
+
+  const deleteVideo = async (id: string) => {
+    if (!confirm("Delete this video?")) return;
+    const { error } = await supabase.from("videos").delete().eq("id", id);
+    if (error) toast.error(error.message);
+    else { toast.success("Video deleted"); fetchVids(); }
   };
 
   return (
     <div className="space-y-6">
       <button onClick={() => setShowAdd(!showAdd)} className="w-full md:w-auto bg-primary py-4 px-8 rounded-2xl font-black flex items-center justify-center gap-2 shadow-neon transition-transform active:scale-95">
-        {showAdd ? <X size={20}/> : <Plus size={20}/>} {showAdd ? "CANCEL" : "ADD NEW VIDEO"}
+        {showAdd ? <i className="fas fa-times"></i> : <i className="fas fa-plus"></i>} {showAdd ? "CANCEL" : "ADD NEW VIDEO"}
       </button>
 
       {showAdd && (
@@ -190,6 +206,9 @@ function VideosContent() {
           <input placeholder="Title" required className="w-full bg-black/50 border border-white/10 p-4 rounded-2xl text-sm" onChange={e => setForm({...form, title: e.target.value})} />
           <input placeholder="Video MP4 Link" required className="w-full bg-black/50 border border-white/10 p-4 rounded-2xl text-sm" onChange={e => setForm({...form, video_url: e.target.value})} />
           <input placeholder="Thumbnail Image Link" className="w-full bg-black/50 border border-white/10 p-4 rounded-2xl text-sm" onChange={e => setForm({...form, thumbnail_url: e.target.value})} />
+          <input placeholder="Category Slug (e.g. 'utamu')" className="w-full bg-black/50 border border-white/10 p-4 rounded-2xl text-sm" onChange={e => setForm({...form, category_slug: e.target.value})} />
+          <input placeholder="Creator Name" className="w-full bg-black/50 border border-white/10 p-4 rounded-2xl text-sm" onChange={e => setForm({...form, creator: e.target.value})} />
+          <input placeholder="Duration (e.g. 3:45)" className="w-full bg-black/50 border border-white/10 p-4 rounded-2xl text-sm" onChange={e => setForm({...form, duration: e.target.value})} />
           <input type="number" placeholder="Price SQ (0 for Free)" className="w-full bg-black/50 border border-white/10 p-4 rounded-2xl text-sm" onChange={e => setForm({...form, price_sq: Number(e.target.value)})} />
           <button className="w-full bg-white text-black py-4 rounded-2xl font-black uppercase tracking-tighter">Publish Now</button>
         </form>
@@ -200,14 +219,14 @@ function VideosContent() {
           <div key={v.id} className="bg-[#111] rounded-3xl border border-white/5 overflow-hidden group">
             <div className="relative aspect-video">
               <img src={v.thumbnail_url || "https://via.placeholder.com/300x200"} className="w-full h-full object-cover" />
-              <div className="absolute top-2 right-2 bg-black/60 backdrop-blur-md px-2 py-1 rounded-lg text-[10px] font-bold">{v.price_sq} SQ</div>
+              <div className="absolute top-2 right-2 bg-black/60 backdrop-blur-md px-2 py-1 rounded-lg text-[10px] font-bold">{v.price_tsh / 100} SQ</div>
             </div>
             <div className="p-4 flex items-center justify-between">
                <div className="min-w-0 flex-1">
                   <p className="font-bold text-sm truncate">{v.title}</p>
                   <p className="text-[10px] text-muted-foreground uppercase">{v.views_count} Views</p>
                </div>
-               <button onClick={async () => { if(confirm("Futa?")) { await supabase.from("videos").delete().eq("id", v.id); fetchVids(); }}} className="text-red-500 p-2 hover:bg-red-500/10 rounded-xl transition-colors"><Trash2 size={18} /></button>
+               <button onClick={() => deleteVideo(v.id)} className="text-red-500 p-2 hover:bg-red-500/10 rounded-xl transition-colors"><i className="fas fa-trash"></i></button>
             </div>
           </div>
         ))}
@@ -237,11 +256,18 @@ function DadazContent() {
     toast.success(!current ? "Dada amekuwa Approved!" : "Ume-unapprove profile");
   };
 
+  const deleteDadaz = async (id: string) => {
+    if (!confirm("Delete this profile?")) return;
+    await supabase.from("dadaz_profiles").delete().eq("id", id);
+    fetchDadaz();
+    toast.success("Profile deleted");
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between mb-4">
         <p className="text-sm font-bold text-muted-foreground">Total: {dadaz.length}</p>
-        <button onClick={fetchDadaz} className="p-2 bg-white/5 rounded-xl"><Clock size={16} /></button>
+        <button onClick={fetchDadaz} className="p-2 bg-white/5 rounded-xl"><i className="fas fa-sync"></i></button>
       </div>
 
       <div className="space-y-3">
@@ -263,13 +289,13 @@ function DadazContent() {
                 onClick={() => toggleApproval(d.id, d.is_admin_approved)}
                 className={`flex-1 sm:flex-initial p-3 rounded-2xl transition-all ${d.is_admin_approved ? "bg-red-500/10 text-red-400" : "bg-green-500/20 text-green-400"}`}
               >
-                {d.is_admin_approved ? <X size={20} /> : <CheckCircle size={20} />}
+                {d.is_admin_approved ? <i className="fas fa-times"></i> : <i className="fas fa-check"></i>}
               </button>
               <button 
-                 onClick={async () => { if(confirm("Delete dada huyu?")) { await supabase.from("dadaz_profiles").delete().eq("id", d.id); fetchDadaz(); }}}
+                 onClick={() => deleteDadaz(d.id)}
                  className="flex-1 sm:flex-initial p-3 bg-red-500/10 text-red-500 rounded-2xl"
               >
-                <Trash2 size={20} />
+                <i className="fas fa-trash"></i>
               </button>
             </div>
           </div>
@@ -295,15 +321,28 @@ function GroupsContent() {
 
   const save = async (e: any) => {
     e.preventDefault();
-    const { error } = await supabase.from("groups").insert([{ ...form, is_published: true }]);
+    const { error } = await supabase.from("groups").insert([{ 
+      name: form.name, 
+      link: form.link, 
+      description: form.description, 
+      is_published: true,
+      price_sq: form.price_sq 
+    }]);
     if (error) toast.error(error.message);
     else { toast.success("Group Added!"); setShowAdd(false); fetchGroups(); }
+  };
+
+  const deleteGroup = async (id: string) => {
+    if (!confirm("Delete this group?")) return;
+    await supabase.from("groups").delete().eq("id", id);
+    fetchGroups();
+    toast.success("Group deleted");
   };
 
   return (
     <div className="space-y-6">
        <button onClick={() => setShowAdd(!showAdd)} className="w-full md:w-auto bg-secondary text-black py-4 px-8 rounded-2xl font-black flex items-center justify-center gap-2 active:scale-95 transition-all">
-        {showAdd ? <X size={20}/> : <Plus size={20}/>} {showAdd ? "CANCEL" : "ADD NEW GROUP"}
+        {showAdd ? <i className="fas fa-times"></i> : <i className="fas fa-plus"></i>} {showAdd ? "CANCEL" : "ADD NEW GROUP"}
       </button>
 
       {showAdd && (
@@ -311,6 +350,7 @@ function GroupsContent() {
           <input placeholder="Group Name" required className="w-full bg-black/50 border border-white/10 p-4 rounded-2xl text-sm" onChange={e => setForm({...form, name: e.target.value})} />
           <input placeholder="WhatsApp/Telegram Link" required className="w-full bg-black/50 border border-white/10 p-4 rounded-2xl text-sm" onChange={e => setForm({...form, link: e.target.value})} />
           <textarea placeholder="Description" className="w-full bg-black/50 border border-white/10 p-4 rounded-2xl text-sm" onChange={e => setForm({...form, description: e.target.value})} />
+          <input type="number" placeholder="Price SQ (0 for Free)" className="w-full bg-black/50 border border-white/10 p-4 rounded-2xl text-sm" onChange={e => setForm({...form, price_sq: Number(e.target.value)})} />
           <button className="w-full bg-white text-black py-4 rounded-2xl font-black uppercase tracking-tighter">Save Group</button>
         </form>
       )}
@@ -322,7 +362,7 @@ function GroupsContent() {
               <h4 className="font-bold truncate">{g.name}</h4>
               <p className="text-[10px] text-secondary font-black truncate uppercase">{g.link}</p>
             </div>
-            <button onClick={async () => { await supabase.from("groups").delete().eq("id", g.id); fetchGroups(); }} className="text-red-500 p-2"><Trash2 size={18} /></button>
+            <button onClick={() => deleteGroup(g.id)} className="text-red-500 p-2"><i className="fas fa-trash"></i></button>
           </div>
         ))}
       </div>
@@ -351,6 +391,13 @@ function RedeemContent() {
     });
     if (error) toast.error(error.message);
     else { toast.success("Code Created!"); fetchCodes(); }
+  };
+
+  const deleteCode = async (id: string) => {
+    if (!confirm("Delete this code?")) return;
+    await supabase.from("redeem_links").delete().eq("id", id);
+    fetchCodes();
+    toast.success("Code deleted");
   };
 
   return (
@@ -387,7 +434,7 @@ function RedeemContent() {
                 <td className="p-4 font-black">{c.coins_sq}</td>
                 <td className="p-4 text-muted-foreground">{c.uses_count}/{c.max_uses}</td>
                 <td className="p-4 text-right">
-                  <button onClick={async () => { await supabase.from("redeem_links").delete().eq("id", c.id); fetchCodes(); }} className="text-red-500"><Trash2 size={14} /></button>
+                  <button onClick={() => deleteCode(c.id)} className="text-red-500"><i className="fas fa-trash"></i></button>
                 </td>
               </tr>
             ))}
@@ -431,7 +478,7 @@ function SettingsContent() {
            <label className="text-[10px] font-black uppercase text-primary ml-1 tracking-widest">SQ to TSh Rate (1 SQ = ? TSh)</label>
            <div className="flex gap-2 mt-2">
              <input value={settings.sq_to_tsh || "100"} onChange={e => setSettings({...settings, sq_to_tsh: e.target.value})} className="flex-1 bg-black/50 border border-white/10 p-4 rounded-2xl" />
-             <button onClick={() => save("sq_to_tsh", settings.sq_to_tsh)} className="bg-white text-black px-6 rounded-2xl font-bold"><Save size={18} /></button>
+             <button onClick={() => save("sq_to_tsh", settings.sq_to_tsh)} className="bg-white text-black px-6 rounded-2xl font-bold"><i className="fas fa-save"></i></button>
            </div>
         </div>
 
@@ -439,7 +486,7 @@ function SettingsContent() {
            <label className="text-[10px] font-black uppercase text-secondary ml-1 tracking-widest">Support WhatsApp Number</label>
            <div className="flex gap-2 mt-2">
              <input value={settings.support_whatsapp || ""} onChange={e => setSettings({...settings, support_whatsapp: e.target.value})} placeholder="+255..." className="flex-1 bg-black/50 border border-white/10 p-4 rounded-2xl" />
-             <button onClick={() => save("support_whatsapp", settings.support_whatsapp)} className="bg-white text-black px-6 rounded-2xl font-bold"><Save size={18} /></button>
+             <button onClick={() => save("support_whatsapp", settings.support_whatsapp)} className="bg-white text-black px-6 rounded-2xl font-bold"><i className="fas fa-save"></i></button>
            </div>
         </div>
         
@@ -447,7 +494,7 @@ function SettingsContent() {
            <label className="text-[10px] font-black uppercase text-purple-400 ml-1 tracking-widest">WhatsApp Channel Link</label>
            <div className="flex gap-2 mt-2">
              <input value={settings.whatsapp_channel || ""} onChange={e => setSettings({...settings, whatsapp_channel: e.target.value})} placeholder="https://chat.whatsapp..." className="flex-1 bg-black/50 border border-white/10 p-4 rounded-2xl" />
-             <button onClick={() => save("whatsapp_channel", settings.whatsapp_channel)} className="bg-white text-black px-6 rounded-2xl font-bold"><Save size={18} /></button>
+             <button onClick={() => save("whatsapp_channel", settings.whatsapp_channel)} className="bg-white text-black px-6 rounded-2xl font-bold"><i className="fas fa-save"></i></button>
            </div>
         </div>
       </div>
