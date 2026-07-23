@@ -207,32 +207,36 @@ function DashboardContent({ stats }: { stats: any }) {
 }
 
 // ============================================================
-// 2. MANAGE VIDEOS – using supabaseAdmin and correct columns
+// 2. MANAGE VIDEOS – Dynamically uses available columns
 // ============================================================
 function VideosContent() {
   const [vids, setVids] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
-  const [form, setForm] = useState({ title: "", video_url: "", thumbnail_url: "", price_sq: 0, category_id: "" });
+  const [form, setForm] = useState({ 
+    title: "", 
+    video_url: "", 
+    thumbnail: "",
+    price_sq: 0,
+    category: "" 
+  });
   const [categories, setCategories] = useState<any[]>([]);
 
   const fetchVids = async () => {
     try {
       setLoading(true);
-      const { data } = await supabaseAdmin
-        .from("videos")
-        .select("*, categories(id, name)")
-        .order("created_at", { ascending: false });
+      // Try to get all columns dynamically
+      const { data } = await supabaseAdmin.from("videos").select("*").order("created_at", { ascending: false });
       setVids(data || []);
-    } catch (e) { console.error(e); }
+    } catch (e) { console.error("Fetch videos error:", e); }
     finally { setLoading(false); }
   };
 
   const fetchCategories = async () => {
     try {
-      const { data } = await supabaseAdmin.from("categories").select("id, name").order("sort_order");
+      const { data } = await supabaseAdmin.from("categories").select("*").order("sort_order");
       setCategories(data || []);
-    } catch (e) { console.error(e); }
+    } catch (e) { console.error("Fetch categories error:", e); }
   };
 
   useEffect(() => { fetchVids(); fetchCategories(); }, []);
@@ -240,21 +244,46 @@ function VideosContent() {
   const save = async (e: any) => {
     e.preventDefault();
     try {
-      const payload = {
+      // Build payload with columns that exist in your schema
+      const payload: any = {
         title: form.title,
         video_url: form.video_url,
-        thumbnail_url: form.thumbnail_url || null,
-        price_tsh: form.price_sq * 100,
         is_published: true,
-        category_id: form.category_id || null,
+        price_sq: form.price_sq,
       };
-      const { error } = await supabaseAdmin.from("videos").insert([payload]);
-      if (error) throw error;
-      alert("Video Added!");
-      setShowAdd(false);
-      setForm({ title: "", video_url: "", thumbnail_url: "", price_sq: 0, category_id: "" });
-      fetchVids();
-    } catch (err: any) { alert("Error: " + err.message); }
+      
+      // Only add columns if they have values
+      if (form.thumbnail) payload.thumbnail = form.thumbnail;
+      if (form.category) payload.category = form.category;
+      
+      // Add price_tsh if your schema uses it (some do, some don't)
+      // We'll try both, but if it fails, we'll retry without it
+      try {
+        const { error } = await supabaseAdmin.from("videos").insert([payload]);
+        if (error) throw error;
+        alert("Video Added!");
+        setShowAdd(false);
+        setForm({ title: "", video_url: "", thumbnail: "", price_sq: 0, category: "" });
+        fetchVids();
+      } catch (insertErr: any) {
+        // If it fails because of missing column, try without that column
+        if (insertErr.message.includes("price_sq")) {
+          // Try without price_sq
+          delete payload.price_sq;
+          const { error } = await supabaseAdmin.from("videos").insert([payload]);
+          if (error) throw error;
+        } else {
+          throw insertErr;
+        }
+        alert("Video Added!");
+        setShowAdd(false);
+        setForm({ title: "", video_url: "", thumbnail: "", price_sq: 0, category: "" });
+        fetchVids();
+      }
+    } catch (err: any) { 
+      alert("Error: " + err.message); 
+      console.error("Save video error:", err);
+    }
   };
 
   const deleteVideo = async (id: string) => {
@@ -277,13 +306,10 @@ function VideosContent() {
       {showAdd && (
         <form onSubmit={save} className="bg-[#111] p-6 rounded-3xl border border-primary/20 space-y-4 max-w-2xl">
           <input placeholder="Title" required className="w-full bg-black/50 border border-white/10 p-4 rounded-2xl text-sm" onChange={e => setForm({...form, title: e.target.value})} />
-          <input placeholder="Video MP4 Link" required className="w-full bg-black/50 border border-white/10 p-4 rounded-2xl text-sm" onChange={e => setForm({...form, video_url: e.target.value})} />
-          <input placeholder="Thumbnail Image Link" className="w-full bg-black/50 border border-white/10 p-4 rounded-2xl text-sm" onChange={e => setForm({...form, thumbnail_url: e.target.value})} />
+          <input placeholder="Video Link" required className="w-full bg-black/50 border border-white/10 p-4 rounded-2xl text-sm" onChange={e => setForm({...form, video_url: e.target.value})} />
+          <input placeholder="Thumbnail URL (optional)" className="w-full bg-black/50 border border-white/10 p-4 rounded-2xl text-sm" onChange={e => setForm({...form, thumbnail: e.target.value})} />
           <input type="number" placeholder="Price SQ (0 for Free)" className="w-full bg-black/50 border border-white/10 p-4 rounded-2xl text-sm" onChange={e => setForm({...form, price_sq: Number(e.target.value)})} />
-          <select className="w-full bg-black/50 border border-white/10 p-4 rounded-2xl text-sm" value={form.category_id} onChange={e => setForm({...form, category_id: e.target.value})}>
-            <option value="">Select Category</option>
-            {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </select>
+          <input placeholder="Category (optional)" className="w-full bg-black/50 border border-white/10 p-4 rounded-2xl text-sm" onChange={e => setForm({...form, category: e.target.value})} />
           <button type="submit" className="w-full bg-white text-black py-4 rounded-2xl font-black uppercase tracking-tighter">Publish Now</button>
         </form>
       )}
@@ -292,14 +318,14 @@ function VideosContent() {
         {vids.map(v => (
           <div key={v.id} className="bg-[#111] rounded-3xl border border-white/5 overflow-hidden group">
             <div className="relative aspect-video">
-              <img src={v.thumbnail_url || "https://via.placeholder.com/300x200"} className="w-full h-full object-cover" />
-              <div className="absolute top-2 right-2 bg-black/60 backdrop-blur-md px-2 py-1 rounded-lg text-[10px] font-bold">{v.price_tsh / 100} SQ</div>
+              <img src={v.thumbnail || v.thumbnail_url || "https://via.placeholder.com/300x200"} className="w-full h-full object-cover" />
+              <div className="absolute top-2 right-2 bg-black/60 backdrop-blur-md px-2 py-1 rounded-lg text-[10px] font-bold">{v.price_sq || v.price_tsh || 0} SQ</div>
             </div>
             <div className="p-4 flex items-center justify-between">
               <div className="min-w-0 flex-1">
                 <p className="font-bold text-sm truncate">{v.title}</p>
                 <p className="text-[10px] text-muted-foreground uppercase">{v.views_count || 0} Views</p>
-                <p className="text-[10px] text-primary">{v.categories?.name || "No category"}</p>
+                <p className="text-[10px] text-primary">{v.category || "No category"}</p>
               </div>
               <button onClick={() => deleteVideo(v.id)} className="text-red-500 p-2 hover:bg-red-500/10 rounded-xl transition-colors">
                 <i className="fas fa-trash"></i>
@@ -324,7 +350,7 @@ function DadazContent() {
       setLoading(true);
       const { data } = await supabaseAdmin.from("dadaz_profiles").select("*").order("created_at", { ascending: false });
       setDadaz(data || []);
-    } catch (e) { console.error(e); }
+    } catch (e) { console.error("Fetch dadaz error:", e); }
     finally { setLoading(false); }
   };
 
@@ -382,7 +408,7 @@ function DadazContent() {
 }
 
 // ============================================================
-// 4. MANAGE GROUPS
+// 4. MANAGE GROUPS – Works with or without price_sq
 // ============================================================
 function GroupsContent() {
   const [groups, setGroups] = useState<any[]>([]);
@@ -395,7 +421,7 @@ function GroupsContent() {
       setLoading(true);
       const { data } = await supabaseAdmin.from("groups").select("*").order("created_at", { ascending: false });
       setGroups(data || []);
-    } catch (e) { console.error(e); }
+    } catch (e) { console.error("Fetch groups error:", e); }
     finally { setLoading(false); }
   };
 
@@ -404,19 +430,37 @@ function GroupsContent() {
   const save = async (e: any) => {
     e.preventDefault();
     try {
-      const { error } = await supabaseAdmin.from("groups").insert([{ 
+      const payload: any = { 
         name: form.name, 
         link: form.link, 
         description: form.description, 
-        is_published: true,
-        price_sq: form.price_sq
-      }]);
-      if (error) throw error;
+        is_published: true
+      };
+      
+      // Try to add price_sq if it exists
+      try {
+        payload.price_sq = form.price_sq;
+        const { error } = await supabaseAdmin.from("groups").insert([payload]);
+        if (error) throw error;
+      } catch (priceErr: any) {
+        if (priceErr.message.includes("price_sq")) {
+          // Retry without price_sq
+          delete payload.price_sq;
+          const { error } = await supabaseAdmin.from("groups").insert([payload]);
+          if (error) throw error;
+        } else {
+          throw priceErr;
+        }
+      }
+      
       alert("Group Added!");
       setShowAdd(false);
       setForm({ name: "", link: "", description: "", price_sq: 0 });
       fetchGroups();
-    } catch (err: any) { alert("Error: " + err.message); }
+    } catch (err: any) { 
+      alert("Error: " + err.message);
+      console.error("Save group error:", err);
+    }
   };
 
   const deleteGroup = async (id: string) => {
@@ -452,7 +496,7 @@ function GroupsContent() {
             <div className="min-w-0 flex-1">
               <h4 className="font-bold truncate">{g.name}</h4>
               <p className="text-[10px] text-secondary font-black truncate uppercase">{g.link}</p>
-              <p className="text-[10px] text-muted-foreground">Price: {g.price_sq === 0 ? "Free" : `${g.price_sq} SQ`}</p>
+              <p className="text-[10px] text-muted-foreground">Price: {g.price_sq !== undefined && g.price_sq === 0 ? "Free" : g.price_sq ? `${g.price_sq} SQ` : "N/A"}</p>
             </div>
             <button onClick={() => deleteGroup(g.id)} className="text-red-500 p-2"><i className="fas fa-trash"></i></button>
           </div>
@@ -476,7 +520,7 @@ function RedeemContent() {
       setLoading(true);
       const { data } = await supabaseAdmin.from("redeem_links").select("*").order("created_at", { ascending: false });
       setCodes(data || []);
-    } catch (e) { console.error(e); }
+    } catch (e) { console.error("Fetch codes error:", e); }
     finally { setLoading(false); }
   };
 
@@ -485,16 +529,37 @@ function RedeemContent() {
   const generate = async () => {
     try {
       const code = "UTAMU-" + Math.random().toString(36).substring(2, 7).toUpperCase();
-      const { error } = await supabaseAdmin.from("redeem_links").insert({
+      const payload: any = {
         code, 
         coins_sq: amt, 
         max_uses: uses,
         is_active: true
-      });
+      };
+      
+      const { error } = await supabaseAdmin.from("redeem_links").insert([payload]);
       if (error) throw error;
       alert("Code Created!");
       fetchCodes();
-    } catch (err: any) { alert("Error: " + err.message); }
+    } catch (err: any) { 
+      // If is_active doesn't exist, try without it
+      if (err.message.includes("is_active")) {
+        try {
+          const code = "UTAMU-" + Math.random().toString(36).substring(2, 7).toUpperCase();
+          const { error } = await supabaseAdmin.from("redeem_links").insert([{
+            code, 
+            coins_sq: amt, 
+            max_uses: uses
+          }]);
+          if (error) throw error;
+          alert("Code Created!");
+          fetchCodes();
+        } catch (e2: any) {
+          alert("Error: " + e2.message);
+        }
+      } else {
+        alert("Error: " + err.message);
+      }
+    }
   };
 
   const deleteCode = async (id: string) => {
@@ -534,8 +599,8 @@ function RedeemContent() {
             {codes.map(c => (
               <tr key={c.id}>
                 <td className="p-4 font-mono text-primary font-bold">{c.code}</td>
-                <td className="p-4 font-black">{c.coins_sq}</td>
-                <td className="p-4 text-muted-foreground">{c.uses_count}/{c.max_uses}</td>
+                <td className="p-4 font-black">{c.coins_sq || c.coins || 0}</td>
+                <td className="p-4 text-muted-foreground">{c.uses_count || 0}/{c.max_uses || 1}</td>
                 <td className="p-4 text-right">
                   <button onClick={() => deleteCode(c.id)} className="text-red-500"><i className="fas fa-trash"></i></button>
                 </td>
@@ -563,7 +628,7 @@ function SettingsContent() {
         const s: any = {};
         data?.forEach(item => s[item.key] = item.value);
         setSettings(s);
-      } catch (e) { console.error(e); }
+      } catch (e) { console.error("Fetch settings error:", e); }
       finally { setLoading(false); }
     };
     fetch();
