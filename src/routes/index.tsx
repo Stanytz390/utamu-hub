@@ -2,7 +2,6 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState, useEffect, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { VideoCard } from "@/components/VideoCard";
-import { PromoBanners } from "@/components/PromoBanners";
 import { CoinBadge } from "@/components/CoinBadge";
 
 export const Route = createFileRoute("/")({
@@ -37,7 +36,6 @@ function Home() {
   const showProfiles = active === "all" || active === "dadaz";
   const showGroups = active === "all" || active === "groups";
 
-  // Fetch all data
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
@@ -52,16 +50,13 @@ function Home() {
         .eq("status", "available")
         .order("created_at", { ascending: false });
 
-      // Apply search if query exists
       if (q.trim()) {
         const search = `%${q.trim()}%`;
         videosQuery = videosQuery.or(`title.ilike.${search}, description.ilike.${search}, creator.ilike.${search}`);
       }
 
-      const { data: videosData, error: videosError } = await videosQuery;
-      if (!videosError) {
-        setVideos(videosData || []);
-      }
+      const { data: videosData } = await videosQuery;
+      if (videosData) setVideos(videosData);
 
       // Fetch Dadaz (business profiles)
       let profilesQuery = supabase
@@ -77,10 +72,8 @@ function Home() {
         );
       }
 
-      const { data: profilesData, error: profilesError } = await profilesQuery;
-      if (!profilesError) {
-        setDadazProfiles(profilesData || []);
-      }
+      const { data: profilesData } = await profilesQuery;
+      if (profilesData) setDadazProfiles(profilesData);
 
       // Fetch groups
       let groupsQuery = supabase
@@ -93,11 +86,10 @@ function Home() {
         groupsQuery = groupsQuery.or(`name.ilike.${search}, description.ilike.${search}`);
       }
 
-      const { data: groupsData, error: groupsError } = await groupsQuery;
-      if (!groupsError) {
-        // Get member counts for each group
+      const { data: groupsData } = await groupsQuery;
+      if (groupsData) {
         const groupsWithCount = await Promise.all(
-          (groupsData || []).map(async (g) => {
+          groupsData.map(async (g) => {
             const { count } = await supabase
               .from("group_memberships")
               .select("*", { count: "exact", head: true })
@@ -109,7 +101,7 @@ function Home() {
       }
 
       // Fetch stories (approved, not expired)
-      const { data: storiesData, error: storiesError } = await supabase
+      const { data: storiesData } = await supabase
         .from("stories")
         .select(`
           *,
@@ -119,9 +111,7 @@ function Home() {
         .gte("expires_at", new Date().toISOString())
         .order("created_at", { ascending: false });
 
-      if (!storiesError) {
-        setStories(storiesData || []);
-      }
+      if (storiesData) setStories(storiesData);
 
       setLoading(false);
     };
@@ -129,7 +119,6 @@ function Home() {
     fetchData();
   }, [q]);
 
-  // Filter based on active category (client-side)
   const filteredVideos = useMemo(() => {
     if (!showVideos) return [];
     return videos;
@@ -157,7 +146,6 @@ function Home() {
 
   return (
     <div className="mx-auto max-w-lg">
-      {/* Header */}
       <header className="sticky top-0 z-40 border-b border-border/60 bg-background/80 px-4 py-3 backdrop-blur-xl">
         <div className="flex items-center justify-between">
           <h1 className="bg-[image:var(--gradient-primary)] bg-clip-text text-2xl font-black tracking-tight text-transparent">
@@ -204,7 +192,7 @@ function Home() {
         </div>
       </header>
 
-      {/* Stories row - only if no search query */}
+      {/* Stories row */}
       {!q.trim() && stories.length > 0 && (
         <section className="px-4 py-4">
           <div className="flex gap-3 overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
