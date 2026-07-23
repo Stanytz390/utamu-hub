@@ -31,6 +31,33 @@ function Home() {
   const [groups, setGroups] = useState<any[]>([]);
   const [stories, setStories] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [isClient, setIsClient] = useState(false); // track client-side mount
+
+  // Only run client-side checks after mount
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+
+  // Check admin role (client-side only)
+  useEffect(() => {
+    if (!isClient) return;
+    const checkAdmin = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        setIsAdmin(false);
+        return;
+      }
+      const { data: roleData } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", user.id)
+        .eq("role", "admin")
+        .maybeSingle();
+      setIsAdmin(!!roleData);
+    };
+    checkAdmin();
+  }, [isClient]);
 
   const showVideos = active === "all" || active === "utamu";
   const showProfiles = active === "all" || active === "dadaz";
@@ -152,7 +179,18 @@ function Home() {
             UTAMU PORI
           </h1>
           <div className="flex items-center gap-2">
-            <CoinBadge />
+            {/* CoinBadge – only render client-side */}
+            {isClient && <CoinBadge />}
+            {/* Admin button – only visible if isAdmin */}
+            {isClient && isAdmin && (
+              <Link
+                to="/admin"
+                className="rounded-full bg-primary/10 p-2 text-primary hover:bg-primary/20 transition-colors"
+                title="Admin Panel"
+              >
+                <i className="fas fa-cog text-sm"></i>
+              </Link>
+            )}
             <Link to="/auth" className="rounded-full bg-muted p-2 text-muted-foreground">
               <i className="fas fa-bell text-sm"></i>
             </Link>
@@ -222,7 +260,7 @@ function Home() {
         </section>
       )}
 
-      {/* Trending Videos */}
+      {/* Trending Videos – only render VideoCard on client */}
       {showVideos && filteredVideos.length > 0 && (
         <section className="px-4 pb-4">
           <div className="mb-3 flex items-center gap-2">
@@ -232,7 +270,8 @@ function Home() {
           <div className="-mx-4 flex gap-3 overflow-x-auto px-4 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {filteredVideos.slice(0, 10).map((v) => (
               <div key={v.id} className="w-64 flex-shrink-0">
-                <VideoCard video={v} />
+                {isClient && <VideoCard video={v} />}
+                {!isClient && <div className="h-[200px] bg-gray-800 rounded-2xl animate-pulse"></div>}
               </div>
             ))}
           </div>
