@@ -43,7 +43,7 @@ export function VideoCard({ video }: { video: VideoItem }) {
     setBusy(false);
     if (error) {
       if (error.message.includes("insufficient")) {
-        setErr("Coins hazitoshi. Nunua SQ zaidi.");
+        setErr("Not enough coins. Top up SQ.");
       } else {
         setErr(error.message);
       }
