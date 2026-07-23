@@ -1,166 +1,156 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Toaster, toast } from "sonner";
+import { toast } from "sonner";
 
-// ============================================
-// Route definition with beforeLoad
-// ============================================
 export const Route = createFileRoute("/admin")({
-  beforeLoad: async ({ location }) => {
+  beforeLoad: async () => {
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      throw new Error("Please log in first.");
-    }
-
+    if (!user) throw new Error("Unauthorized");
     const adminEmail = import.meta.env.VITE_ADMIN_EMAIL;
-    const isAdminEmail = adminEmail && user.email === adminEmail;
-
-    // Fetch or create profile
-    let { data: profile, error } = await supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", user.id)
-      .maybeSingle();
-
-    if (error) {
-      console.error("Profile fetch error:", error);
-      throw new Error("Could not fetch user profile");
+    if (adminEmail && user.email === adminEmail) {
+      await supabase.from("profiles").upsert({ id: user.id, role: "admin" }, { onConflict: "id" });
     }
-
-    // If no profile exists, create one
-    if (!profile) {
-      const { error: insertError } = await supabase
-        .from("profiles")
-        .insert({
-          id: user.id,
-          email: user.email,
-          full_name: user.user_metadata?.username || user.email?.split("@")[0] || "User",
-          role: isAdminEmail ? "admin" : "user",
-        });
-      if (insertError) {
-        console.error("Profile creation error:", insertError);
-        throw new Error("Could not create user profile");
-      }
-      // Re‑fetch to get the role
-      const { data: newProfile } = await supabase
-        .from("profiles")
-        .select("role")
-        .eq("id", user.id)
-        .single();
-      profile = newProfile;
-    }
-
-    // If user is admin email but role is not admin, promote
-    if (isAdminEmail && profile?.role !== "admin") {
-      const { error: updateError } = await supabase
-        .from("profiles")
-        .update({ role: "admin" })
-        .eq("id", user.id);
-      if (updateError) {
-        console.error("Admin promotion error:", updateError);
-        throw new Error("Could not promote to admin");
-      }
-      profile.role = "admin";
-    }
-
-    // Check if user has admin role
-    if (profile?.role !== "admin") {
-      throw new Error("You do not have admin access.");
-    }
-
-    return { user, profile };
+    const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single();
+    if (profile?.role !== "admin") throw new Error("Admin access required");
   },
   component: AdminDashboard,
 });
 
-// ============================================
-// Admin Dashboard Component
-// ============================================
 function AdminDashboard() {
   const navigate = useNavigate();
-  const { user, profile } = Route.useRouteContext(); // or useLoaderData? Actually we'll use useRouteContext
+  const [user, setUser] = useState<any>(null);
+  const [activeTab, setActiveTab] = useState("dashboard");
 
-  // If we didn't pass context, we can fetch it again, but we'll use the route's loaderData if available.
-  // Better: use the beforeLoad's return as context via `useRouteContext` after defining it.
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => setUser(data.user));
+  }, []);
 
-  return (
-    <div className="min-h-screen bg-gray-50 p-6">
-      <Toaster position="top-right" richColors />
-      <div className="max-w-7xl mx-auto">
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-3xl font-bold">Admin Dashboard</h1>
-          <div className="flex items-center gap-4">
-            <span className="text-sm text-gray-600">{user?.email}</span>
-            <button
-              onClick={async () => {
-                await supabase.auth.signOut();
-                navigate({ to: "/auth" });
-              }}
-              className="text-sm text-red-600 hover:underline"
-            >
-              Sign Out
-            </button>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-          <StatCard title="Users" value="1,234" icon="fa-users" color="blue" />
-          <StatCard title="Videos" value="56" icon="fa-video" color="purple" />
-          <StatCard title="Groups" value="12" icon="fa-users-cog" color="green" />
-          <StatCard title="Coins" value="10,567" icon="fa-coins" color="gold" />
-        </div>
-
-        <div className="bg-white rounded-xl shadow-sm p-6 border">
-          <h2 className="text-xl font-bold mb-4">Quick Actions</h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <Link to="/admin/videos" className="p-4 bg-purple-50 rounded-lg text-center hover:bg-purple-100">
-              <i className="fas fa-video text-2xl text-purple-600"></i>
-              <p className="text-sm mt-1">Manage Videos</p>
-            </Link>
-            <Link to="/admin/users" className="p-4 bg-blue-50 rounded-lg text-center hover:bg-blue-100">
-              <i className="fas fa-users text-2xl text-blue-600"></i>
-              <p className="text-sm mt-1">Manage Users</p>
-            </Link>
-            <Link to="/admin/groups" className="p-4 bg-green-50 rounded-lg text-center hover:bg-green-100">
-              <i className="fas fa-users-cog text-2xl text-green-600"></i>
-              <p className="text-sm mt-1">Manage Groups</p>
-            </Link>
-            <Link to="/admin/settings" className="p-4 bg-yellow-50 rounded-lg text-center hover:bg-yellow-100">
-              <i className="fas fa-cog text-2xl text-yellow-600"></i>
-              <p className="text-sm mt-1">Settings</p>
-            </Link>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ============================================
-// StatCard Component
-// ============================================
-function StatCard({ title, value, icon, color }) {
-  const colors = {
-    blue: "bg-blue-50 text-blue-600",
-    purple: "bg-purple-50 text-purple-600",
-    green: "bg-green-50 text-green-600",
-    gold: "bg-yellow-50 text-yellow-600",
+  const signOut = async () => {
+    await supabase.auth.signOut();
+    navigate({ to: "/auth" });
   };
+
   return (
-    <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
-      <div className={`w-10 h-10 rounded-full flex items-center justify-center ${colors[color]}`}>
-        <i className={`fas ${icon} w-4 text-center`}></i>
-      </div>
-      <p className="text-2xl font-bold mt-2">{value}</p>
-      <p className="text-sm text-gray-500">{title}</p>
+    <div className="flex min-h-screen bg-gray-50">
+      <aside className="w-64 bg-white border-r p-4">
+        <h1 className="text-xl font-bold text-purple-600">Admin</h1>
+        <p className="text-xs text-gray-500">{user?.email}</p>
+        <nav className="mt-4 space-y-1">
+          {["dashboard", "users", "videos", "groups", "business"].map(tab => (
+            <button key={tab} onClick={() => setActiveTab(tab)} className={`w-full text-left px-3 py-2 rounded ${activeTab === tab ? "bg-purple-100" : "hover:bg-gray-100"}`}>
+              {tab.charAt(0).toUpperCase() + tab.slice(1)}
+            </button>
+          ))}
+        </nav>
+        <button onClick={signOut} className="mt-4 text-red-500">Sign Out</button>
+      </aside>
+      <main className="flex-1 p-6">
+        {activeTab === "dashboard" && <Dashboard />}
+        {activeTab === "users" && <Users />}
+        {activeTab === "videos" && <Videos />}
+        {activeTab === "groups" && <Groups />}
+        {activeTab === "business" && <Business />}
+      </main>
     </div>
   );
 }
 
-// ============================================
-// Error Boundary for the route (if needed)
-// ============================================
-// If the beforeLoad throws, TanStack Router will show a default error component.
-// You can customize it by adding an errorComponent to the route.
-// For simplicity, we'll just let it throw and the router will handle it.
+function Dashboard() {
+  const [stats, setStats] = useState({ users: 0, videos: 0 });
+  useEffect(() => {
+    Promise.all([
+      supabase.from("profiles").select("*", { count: "exact", head: true }),
+      supabase.from("videos").select("*", { count: "exact", head: true }),
+    ]).then(([users, videos]) => setStats({ users: users.count || 0, videos: videos.count || 0 }));
+  }, []);
+  return (
+    <div>
+      <h2 className="text-2xl font-bold">Dashboard</h2>
+      <div className="grid grid-cols-2 gap-4 mt-4">
+        <div className="bg-white p-4 rounded shadow"><p className="text-2xl font-bold">{stats.users}</p><p>Users</p></div>
+        <div className="bg-white p-4 rounded shadow"><p className="text-2xl font-bold">{stats.videos}</p><p>Videos</p></div>
+      </div>
+    </div>
+  );
+}
+
+function Users() {
+  const [users, setUsers] = useState([]);
+  useEffect(() => {
+    supabase.from("profiles").select("*").then(({ data }) => setUsers(data || []));
+  }, []);
+  return (
+    <div>
+      <h2 className="text-2xl font-bold">Users</h2>
+      <table className="w-full mt-4 bg-white rounded shadow">
+        <thead><tr><th className="p-2">Name</th><th className="p-2">Email</th><th className="p-2">Role</th></tr></thead>
+        <tbody>
+          {users.map(u => (
+            <tr key={u.id} className="border-t"><td className="p-2">{u.full_name || u.username}</td><td className="p-2">{u.email}</td><td className="p-2">{u.role}</td></tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function Videos() {
+  const [videos, setVideos] = useState([]);
+  useEffect(() => {
+    supabase.from("videos").select("*").then(({ data }) => setVideos(data || []));
+  }, []);
+  return (
+    <div>
+      <h2 className="text-2xl font-bold">Videos</h2>
+      <table className="w-full mt-4 bg-white rounded shadow">
+        <thead><tr><th className="p-2">Title</th><th className="p-2">Price (SQ)</th><th className="p-2">Status</th></tr></thead>
+        <tbody>
+          {videos.map(v => (
+            <tr key={v.id} className="border-t"><td className="p-2">{v.title}</td><td className="p-2">{v.price_sq}</td><td className="p-2">{v.status}</td></tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function Groups() {
+  const [groups, setGroups] = useState([]);
+  useEffect(() => {
+    supabase.from("groups").select("*").then(({ data }) => setGroups(data || []));
+  }, []);
+  return (
+    <div>
+      <h2 className="text-2xl font-bold">Groups</h2>
+      <table className="w-full mt-4 bg-white rounded shadow">
+        <thead><tr><th className="p-2">Name</th><th className="p-2">Price (SQ)</th><th className="p-2">Members</th></tr></thead>
+        <tbody>
+          {groups.map(g => (
+            <tr key={g.id} className="border-t"><td className="p-2">{g.name}</td><td className="p-2">{g.price_sq}</td><td className="p-2">{g.members}</td></tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function Business() {
+  const [businesses, setBusinesses] = useState([]);
+  useEffect(() => {
+    supabase.from("profiles").select("*").eq("role", "business").then(({ data }) => setBusinesses(data || []));
+  }, []);
+  return (
+    <div>
+      <h2 className="text-2xl font-bold">Business (Dadaz)</h2>
+      <table className="w-full mt-4 bg-white rounded shadow">
+        <thead><tr><th className="p-2">Name</th><th className="p-2">Email</th><th className="p-2">Status</th></tr></thead>
+        <tbody>
+          {businesses.map(b => (
+            <tr key={b.id} className="border-t"><td className="p-2">{b.full_name}</td><td className="p-2">{b.email}</td><td className="p-2">{b.is_approved ? "✅" : "⏳"}</td></tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
