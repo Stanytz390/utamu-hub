@@ -3,33 +3,69 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
 // ============================================================
-// ROUTE PROTECTION
+// ROUTE PROTECTION - with error logging
 // ============================================================
 export const Route = createFileRoute("/admin")({
   beforeLoad: async () => {
+    console.log("🔍 Admin beforeLoad started");
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error("Please login first");
+    console.log("👤 User:", user?.email);
+    if (!user) {
+      console.error("❌ No user found");
+      throw new Error("Please login first");
+    }
 
-    const { data: roleData } = await supabase
+    const { data: roleData, error } = await supabase
       .from("user_roles")
       .select("role")
       .eq("user_id", user.id)
       .eq("role", "admin")
       .maybeSingle();
+    console.log("🔑 Role data:", roleData);
 
-    if (!roleData) throw new Error("Unauthorized Access");
+    if (error) {
+      console.error("❌ Role fetch error:", error);
+      throw new Error("Error checking admin role");
+    }
+
+    if (!roleData) {
+      console.error("❌ User is not admin");
+      throw new Error("Unauthorized Access");
+    }
+
+    console.log("✅ Admin access granted!");
     return { user };
   },
   component: AdminDashboard,
 });
 
 // ============================================================
-// MAIN DASHBOARD
+// ADMIN DASHBOARD
 // ============================================================
 function AdminDashboard() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("dashboard");
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState({ users: 0, videos: 0, groups: 0, dadaz: 0 });
+
+  // Fetch stats
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const { count: u } = await supabase.from("profiles").select("*", { count: "exact", head: true });
+        const { count: v } = await supabase.from("videos").select("*", { count: "exact", head: true });
+        const { count: g } = await supabase.from("groups").select("*", { count: "exact", head: true });
+        const { count: d } = await supabase.from("dadaz_profiles").select("*", { count: "exact", head: true });
+        setStats({ users: u || 0, videos: v || 0, groups: g || 0, dadaz: d || 0 });
+      } catch (e) {
+        console.error("Stats error:", e);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchStats();
+  }, []);
 
   const menuItems = [
     { id: "dashboard", label: "Dashboard", icon: "fa-chart-line" },
@@ -104,14 +140,20 @@ function AdminDashboard() {
           <p className="text-muted-foreground text-sm">Welcome back, Admin.</p>
         </header>
 
-        <div>
-          {activeTab === "dashboard" && <DashboardContent />}
-          {activeTab === "videos" && <VideosContent />}
-          {activeTab === "dadaz" && <DadazContent />}
-          {activeTab === "groups" && <GroupsContent />}
-          {activeTab === "redeem" && <RedeemContent />}
-          {activeTab === "settings" && <SettingsContent />}
-        </div>
+        {loading ? (
+          <div className="flex justify-center items-center h-40">
+            <i className="fas fa-spinner fa-spin text-2xl text-primary"></i>
+          </div>
+        ) : (
+          <>
+            {activeTab === "dashboard" && <DashboardContent stats={stats} />}
+            {activeTab === "videos" && <VideosContent />}
+            {activeTab === "dadaz" && <DadazContent />}
+            {activeTab === "groups" && <GroupsContent />}
+            {activeTab === "redeem" && <RedeemContent />}
+            {activeTab === "settings" && <SettingsContent />}
+          </>
+        )}
       </main>
     </div>
   );
@@ -120,35 +162,10 @@ function AdminDashboard() {
 // ============================================================
 // 1. DASHBOARD
 // ============================================================
-function DashboardContent() {
-  const [stats, setStats] = useState({ users: 0, vids: 0, groups: 0, dadaz: 0 });
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        setLoading(true);
-        const { count: u } = await supabase.from("profiles").select("*", { count: "exact", head: true });
-        const { count: v } = await supabase.from("videos").select("*", { count: "exact", head: true });
-        const { count: g } = await supabase.from("groups").select("*", { count: "exact", head: true });
-        const { count: d } = await supabase.from("dadaz_profiles").select("*", { count: "exact", head: true });
-        setStats({ users: u || 0, vids: v || 0, groups: g || 0, dadaz: d || 0 });
-      } catch (err) {
-        console.error("Error fetching stats:", err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchStats();
-  }, []);
-
-  if (loading) {
-    return <div className="flex justify-center items-center h-40"><i className="fas fa-spinner fa-spin text-2xl text-primary"></i></div>;
-  }
-
+function DashboardContent({ stats }: { stats: any }) {
   const cards = [
     { label: "Total Users", value: stats.users, icon: "fa-users", color: "text-blue-400" },
-    { label: "Total Videos", value: stats.vids, icon: "fa-video", color: "text-primary" },
+    { label: "Total Videos", value: stats.videos, icon: "fa-video", color: "text-primary" },
     { label: "Total Groups", value: stats.groups, icon: "fa-users", color: "text-secondary" },
     { label: "Total Dadaz", value: stats.dadaz, icon: "fa-user-check", color: "text-purple-400" },
   ];
@@ -167,26 +184,21 @@ function DashboardContent() {
 }
 
 // ============================================================
-// 2. MANAGE VIDEOS (full CRUD)
+// 2. MANAGE VIDEOS
 // ============================================================
 function VideosContent() {
   const [vids, setVids] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
-  const [form, setForm] = useState({
-    title: "",
-    video_url: "",
-    thumbnail_url: "",
-    price_sq: 0,
-  });
+  const [form, setForm] = useState({ title: "", video_url: "", thumbnail_url: "", price_sq: 0 });
 
   const fetchVids = async () => {
     try {
       setLoading(true);
       const { data } = await supabase.from("videos").select("*").order("created_at", { ascending: false });
       setVids(data || []);
-    } catch (err) {
-      console.error(err);
+    } catch (e) {
+      console.error(e);
     } finally {
       setLoading(false);
     }
@@ -203,7 +215,6 @@ function VideosContent() {
         thumbnail_url: form.thumbnail_url || null,
         price_tsh: form.price_sq * 100,
         is_published: true,
-        creator: "Admin",
         category_slug: "utamu",
       };
       const { error } = await supabase.from("videos").insert([payload]);
@@ -281,8 +292,8 @@ function DadazContent() {
       setLoading(true);
       const { data } = await supabase.from("dadaz_profiles").select("*").order("created_at", { ascending: false });
       setDadaz(data || []);
-    } catch (err) {
-      console.error(err);
+    } catch (e) {
+      console.error(e);
     } finally {
       setLoading(false);
     }
@@ -359,8 +370,8 @@ function GroupsContent() {
       setLoading(true);
       const { data } = await supabase.from("groups").select("*").order("created_at", { ascending: false });
       setGroups(data || []);
-    } catch (err) {
-      console.error(err);
+    } catch (e) {
+      console.error(e);
     } finally {
       setLoading(false);
     }
@@ -445,8 +456,8 @@ function RedeemContent() {
       setLoading(true);
       const { data } = await supabase.from("redeem_links").select("*").order("created_at", { ascending: false });
       setCodes(data || []);
-    } catch (err) {
-      console.error(err);
+    } catch (e) {
+      console.error(e);
     } finally {
       setLoading(false);
     }
@@ -541,8 +552,8 @@ function SettingsContent() {
         const s: any = {};
         data?.forEach(item => s[item.key] = item.value);
         setSettings(s);
-      } catch (err) {
-        console.error(err);
+      } catch (e) {
+        console.error(e);
       } finally {
         setLoading(false);
       }
