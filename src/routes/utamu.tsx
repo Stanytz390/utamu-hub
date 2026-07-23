@@ -2,7 +2,6 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState, useMemo, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { VideoCard } from "@/components/VideoCard";
-import { shareContent } from "@/lib/share";
 
 export const Route = createFileRoute("/utamu")({
   head: () => ({
@@ -24,7 +23,6 @@ function Utamu() {
   const [videos, setVideos] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Fetch videos from Supabase
   useEffect(() => {
     const fetchVideos = async () => {
       setLoading(true);
@@ -34,23 +32,19 @@ function Utamu() {
           *,
           profiles:creator_id ( full_name, avatar_url )
         `)
-        .eq("status", "available"); // Only show available videos
+        .eq("status", "available");
 
-      // Search filter
       if (q.trim()) {
         const search = `%${q.trim()}%`;
-        query = query.or(
-          `title.ilike.${search}, description.ilike.${search}, creator.ilike.${search}`
-        );
+        query = query.or(`title.ilike.${search}, description.ilike.${search}, creator.ilike.${search}`);
       }
 
-      // Sorting
       if (f === "New") {
         query = query.order("created_at", { ascending: false });
       } else if (f === "Old") {
         query = query.order("created_at", { ascending: true });
       } else {
-        query = query.order("created_at", { ascending: false }); // default newest
+        query = query.order("created_at", { ascending: false });
       }
 
       const { data, error } = await query;
@@ -58,7 +52,6 @@ function Utamu() {
         console.error("Error fetching videos:", error);
         setVideos([]);
       } else {
-        // Map to match expected VideoCard props
         const mapped = (data || []).map((v: any) => ({
           ...v,
           creator: v.profiles?.full_name || v.creator || "Unknown",
@@ -72,7 +65,6 @@ function Utamu() {
     fetchVideos();
   }, [f, q]);
 
-  // Additional client-side filtering for Free/Premium
   const filteredVideos = useMemo(() => {
     let out = videos;
     if (f === "Free") {
@@ -128,16 +120,7 @@ function Utamu() {
           </p>
         )}
         {filteredVideos.map((v) => (
-          <div key={v.id} className="relative">
-            <VideoCard video={v} />
-            <button
-              onClick={() => shareContent('video', v.id, v.title, v.description)}
-              className="absolute top-2 right-2 text-white bg-black/40 rounded-full p-1.5 hover:bg-black/60 transition z-10"
-              aria-label="Share"
-            >
-              <i className="fas fa-share-alt text-xs"></i>
-            </button>
-          </div>
+          <VideoCard key={v.id} video={v} />
         ))}
       </section>
     </div>
