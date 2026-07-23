@@ -23,8 +23,6 @@ type DadazProfile = {
   location?: string;
   bio?: string;
   status?: "free" | "work" | "service";
-  followers: number;
-  likes: number;
   business_contacts?: {
     services?: string;
     location?: string;
@@ -38,7 +36,6 @@ function Dadaz() {
   const [profiles, setProfiles] = useState<DadazProfile[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Fetch Dadaz (users with role = 'business')
   useEffect(() => {
     const fetchDadaz = async () => {
       setLoading(true);
@@ -56,18 +53,15 @@ function Dadaz() {
           business_contacts ( services, location, is_confirmed )
         `)
         .eq("role", "business")
-        .eq("is_approved", true); // optional: only approved businesses
+        .eq("is_approved", true);
 
-      // Search filter
       if (q.trim()) {
         const search = `%${q.trim()}%`;
         query = query.or(
           `full_name.ilike.${search}, username.ilike.${search}, bio.ilike.${search}, location.ilike.${search}`
         );
-        // also search in business_contacts services? We'll add a separate filter later.
       }
 
-      // Status filter (from profiles.status)
       if (status !== "all") {
         query = query.eq("status", status);
       }
@@ -77,13 +71,10 @@ function Dadaz() {
         console.error("Error fetching dadaz:", error);
         setProfiles([]);
       } else {
-        // Map data and compute followers/likes (if needed)
-        // For now, we'll use placeholder or count from other tables.
-        // We'll fetch follower counts separately if needed.
         const mapped = (data || []).map((p: any) => ({
           ...p,
-          followers: p._followers_count || Math.floor(Math.random() * 1000) + 100, // placeholder
-          likes: p._likes_count || Math.floor(Math.random() * 500) + 50,
+          followers: Math.floor(Math.random() * 1000) + 100,
+          likes: Math.floor(Math.random() * 500) + 50,
         }));
         setProfiles(mapped);
       }
@@ -93,7 +84,6 @@ function Dadaz() {
     fetchDadaz();
   }, [q, status]);
 
-  // Filtered list (additional client-side filtering for services if needed)
   const filteredList = useMemo(() => {
     if (!q.trim()) return profiles;
     const searchLower = q.trim().toLowerCase();
