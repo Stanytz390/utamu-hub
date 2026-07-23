@@ -31,6 +31,26 @@ function Home() {
   const [groups, setGroups] = useState<any[]>([]);
   const [stories, setStories] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  // Check if current user is admin
+  useEffect(() => {
+    const checkAdmin = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        setIsAdmin(false);
+        return;
+      }
+      const { data: roleData } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", user.id)
+        .eq("role", "admin")
+        .maybeSingle();
+      setIsAdmin(!!roleData);
+    };
+    checkAdmin();
+  }, []);
 
   const showVideos = active === "all" || active === "utamu";
   const showProfiles = active === "all" || active === "dadaz";
@@ -153,6 +173,16 @@ function Home() {
           </h1>
           <div className="flex items-center gap-2">
             <CoinBadge />
+            {/* Admin button – only visible if isAdmin */}
+            {isAdmin && (
+              <Link
+                to="/admin"
+                className="rounded-full bg-primary/10 p-2 text-primary hover:bg-primary/20 transition-colors"
+                title="Admin Panel"
+              >
+                <i className="fas fa-cog text-sm"></i>
+              </Link>
+            )}
             <Link to="/auth" className="rounded-full bg-muted p-2 text-muted-foreground">
               <i className="fas fa-bell text-sm"></i>
             </Link>
