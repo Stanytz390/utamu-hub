@@ -1,6 +1,31 @@
 import { createFileRoute, useNavigate, Link, useSearch } from "@tanstack/react-router";
-import { useState, useEffect } from "react";
+import { useState, useEffect, Component } from "react";
 import { supabase } from "@/integrations/supabase/client";
+
+// Error Boundary
+class ErrorBoundary extends Component<{ children: React.ReactNode }, { hasError: boolean; error: Error | null }> {
+  constructor(props: any) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="p-6 text-center text-red-600 bg-red-50 rounded-xl max-w-lg mx-auto mt-10">
+          <p className="font-bold">Oops! Something went wrong.</p>
+          <pre className="text-xs mt-2 whitespace-pre-wrap bg-white p-4 rounded border">
+            {this.state.error?.message || "Unknown error"}
+          </pre>
+          <p className="text-sm mt-4">Check your environment variables (VITE_SUPABASE_URL, VITE_SUPABASE_KEY).</p>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 export const Route = createFileRoute("/auth")({
   validateSearch: (s: Record<string, unknown>) => ({
@@ -12,7 +37,11 @@ export const Route = createFileRoute("/auth")({
       { name: "description", content: "Sign in or create your account." },
     ],
   }),
-  component: AuthPage,
+  component: () => (
+    <ErrorBoundary>
+      <AuthPage />
+    </ErrorBoundary>
+  ),
 });
 
 function AuthPage() {
@@ -26,13 +55,12 @@ function AuthPage() {
   const [err, setErr] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
 
-  // Check existing session & auto-promote admin via env var (never shown)
+  // Check session on mount
   useEffect(() => {
     const checkSession = async () => {
       try {
         const { data } = await supabase.auth.getSession();
         if (data.session) {
-          // Auto-promote admin (if configured, uses env var internally)
           const adminEmail = import.meta.env.VITE_ADMIN_EMAIL;
           if (adminEmail && data.session.user.email === adminEmail) {
             await supabase
@@ -50,7 +78,7 @@ function AuthPage() {
           navigate({ to: "/", replace: true });
         }
       } catch (e) {
-        console.error("Session check error:", e);
+        setErr("Session check failed: " + (e as Error).message);
       }
     };
     checkSession();
@@ -65,7 +93,6 @@ function AuthPage() {
     try {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
-      // Auto-promote admin (if configured)
       const adminEmail = import.meta.env.VITE_ADMIN_EMAIL;
       if (adminEmail && data.user.email === adminEmail) {
         await supabase
