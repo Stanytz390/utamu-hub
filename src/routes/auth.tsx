@@ -26,27 +26,31 @@ function AuthPage() {
   const [err, setErr] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
 
-  // Check existing session
+  // Check existing session & auto-promote admin via env var (never shown)
   useEffect(() => {
     const checkSession = async () => {
-      const { data } = await supabase.auth.getSession();
-      if (data.session) {
-        // Auto‑promote admin if email matches
-        const adminEmail = import.meta.env.VITE_ADMIN_EMAIL;
-        if (adminEmail && data.session.user.email === adminEmail) {
-          await supabase
-            .from("profiles")
-            .upsert(
-              { 
-                id: data.session.user.id, 
-                role: "admin",
-                email: data.session.user.email,
-                full_name: data.session.user.user_metadata?.username || "Admin"
-              },
-              { onConflict: "id" }
-            );
+      try {
+        const { data } = await supabase.auth.getSession();
+        if (data.session) {
+          // Auto-promote admin (if configured, uses env var internally)
+          const adminEmail = import.meta.env.VITE_ADMIN_EMAIL;
+          if (adminEmail && data.session.user.email === adminEmail) {
+            await supabase
+              .from("profiles")
+              .upsert(
+                { 
+                  id: data.session.user.id, 
+                  role: "admin",
+                  email: data.session.user.email,
+                  full_name: data.session.user.user_metadata?.username || "Admin"
+                },
+                { onConflict: "id" }
+              );
+          }
+          navigate({ to: "/", replace: true });
         }
-        navigate({ to: "/", replace: true });
+      } catch (e) {
+        console.error("Session check error:", e);
       }
     };
     checkSession();
@@ -61,7 +65,7 @@ function AuthPage() {
     try {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
-      // Auto‑promote admin if email matches
+      // Auto-promote admin (if configured)
       const adminEmail = import.meta.env.VITE_ADMIN_EMAIL;
       if (adminEmail && data.user.email === adminEmail) {
         await supabase
@@ -84,7 +88,7 @@ function AuthPage() {
     }
   };
 
-  // Sign Up – no email verification required
+  // Sign Up – no email verification
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     setErr(null);
@@ -104,9 +108,7 @@ function AuthPage() {
       if (error) throw error;
       if (ref) sessionStorage.setItem("pending_ref", ref);
       
-      // If email confirmation is OFF, user is logged in immediately
       if (data.session) {
-        // Auto‑promote admin if email matches
         const adminEmail = import.meta.env.VITE_ADMIN_EMAIL;
         if (adminEmail && data.user?.email === adminEmail) {
           await supabase
@@ -123,7 +125,6 @@ function AuthPage() {
         }
         navigate({ to: "/", replace: true });
       } else {
-        // Fallback – redirect to sign in (should not happen if email confirmation is off)
         setInfo("Account created! Please sign in.");
         setMode("signin");
       }
@@ -246,11 +247,6 @@ function AuthPage() {
           Sign Up
         </button>
       </div>
-
-      {/* Admin hint – optional, can be removed */}
-      <p className="mt-4 text-center text-[10px] text-muted-foreground">
-        Admin: {import.meta.env.VITE_ADMIN_EMAIL || "officialstanlee143@gmail.com"}
-      </p>
     </div>
   );
 }
