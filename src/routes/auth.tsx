@@ -1,8 +1,6 @@
 import { createFileRoute, useNavigate, Link, useSearch } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
-import { LogIn, Mail, Lock, ArrowLeft } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { lovable } from "@/integrations/lovable";
 
 export const Route = createFileRoute("/auth")({
   validateSearch: (s: Record<string, unknown>) => ({ ref: typeof s.ref === "string" ? s.ref : undefined }),
@@ -29,7 +27,7 @@ function AuthPage() {
   useEffect(() => {
     if (ref) setMode("signup");
     supabase.auth.getUser().then(({ data }) => {
-      if (data.user) navigate({ to: "/profile", replace: true });
+      if (data.user) navigate({ to: "/", replace: true });
     });
   }, [navigate, ref]);
 
@@ -45,16 +43,19 @@ function AuthPage() {
           password,
           options: {
             emailRedirectTo: window.location.origin,
-            data: { username: username || email.split("@")[0], referral_code: ref ?? null },
+            data: { 
+              username: username || email.split("@")[0],
+              referral_code: ref ?? null 
+            },
           },
         });
         if (error) throw error;
         if (ref && typeof window !== "undefined") sessionStorage.setItem("pending_ref", ref);
-        setInfo("Account imefunguliwa. Ukiona ukurasa wa email confirmation, angalia inbox yako. Ukiwa umeingia, elekea Profile.");
+        setInfo("Account imefunguliwa. Angalia email yako kwa uthibitisho.");
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
-        navigate({ to: "/profile", replace: true });
+        navigate({ to: "/", replace: true });
       }
     } catch (e: unknown) {
       setErr(e instanceof Error ? e.message : "Imeshindikana");
@@ -66,23 +67,23 @@ function AuthPage() {
   const onGoogle = async () => {
     setErr(null);
     if (ref && typeof window !== "undefined") sessionStorage.setItem("pending_ref", ref);
-    const result = await lovable.auth.signInWithOAuth("google", {
-      redirect_uri: window.location.origin,
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`,
+      },
     });
-    if (result.error) setErr(result.error.message ?? "Google sign-in imeshindikana");
-    if (!result.error && !result.redirected) {
-      navigate({ to: "/profile", replace: true });
-    }
+    if (error) setErr(error.message);
   };
 
   return (
     <div className="mx-auto max-w-lg px-4 py-6">
       <Link to="/" className="mb-6 inline-flex items-center gap-1 text-sm text-muted-foreground">
-        <ArrowLeft size={14} /> Rudi Home
+        <i className="fas fa-arrow-left text-xs mr-1"></i> Rudi Home
       </Link>
       <div className="mb-6 text-center">
         <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-full bg-[image:var(--gradient-primary)] shadow-[var(--shadow-neon)]">
-          <LogIn size={28} className="text-primary-foreground" />
+          <i className="fas fa-sign-in-alt text-2xl text-primary-foreground"></i>
         </div>
         <h1 className="bg-[image:var(--gradient-primary)] bg-clip-text text-2xl font-black text-transparent">
           UTAMU PORI
@@ -125,7 +126,7 @@ function AuthPage() {
         <div>
           <label className="mb-1 block text-xs text-muted-foreground">Email</label>
           <div className="relative">
-            <Mail size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <i className="fas fa-envelope absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-xs"></i>
             <input
               type="email"
               required
@@ -139,7 +140,7 @@ function AuthPage() {
         <div>
           <label className="mb-1 block text-xs text-muted-foreground">Password</label>
           <div className="relative">
-            <Lock size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <i className="fas fa-lock absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-xs"></i>
             <input
               type="password"
               required
@@ -164,7 +165,8 @@ function AuthPage() {
           disabled={loading}
           className="w-full rounded-xl bg-primary py-3 font-bold text-primary-foreground shadow-[var(--shadow-neon)] disabled:opacity-60"
         >
-          {loading ? "Inaendelea..." : mode === "signin" ? "Sign in" : "Sign up"}
+          {loading ? <i className="fas fa-spinner fa-spin mr-2"></i> : null}
+          {mode === "signin" ? "Sign in" : "Sign up"}
         </button>
       </form>
 
