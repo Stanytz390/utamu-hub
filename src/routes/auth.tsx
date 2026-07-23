@@ -51,14 +51,14 @@ function AuthPage() {
         });
         if (error) throw error;
         if (ref && typeof window !== "undefined") sessionStorage.setItem("pending_ref", ref);
-        setInfo("Account imefunguliwa. Angalia email yako kwa uthibitisho.");
+        setInfo("Account created. Check your email for confirmation.");
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
         navigate({ to: "/", replace: true });
       }
     } catch (e: unknown) {
-      setErr(e instanceof Error ? e.message : "Imeshindikana");
+      setErr(e instanceof Error ? e.message : "Something went wrong");
     } finally {
       setLoading(false);
     }
@@ -79,7 +79,7 @@ function AuthPage() {
   return (
     <div className="mx-auto max-w-lg px-4 py-6">
       <Link to="/" className="mb-6 inline-flex items-center gap-1 text-sm text-muted-foreground">
-        <i className="fas fa-arrow-left text-xs mr-1"></i> Rudi Home
+        <i className="fas fa-arrow-left text-xs mr-1"></i> Back to Home
       </Link>
       <div className="mb-6 text-center">
         <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-full bg-[image:var(--gradient-primary)] shadow-[var(--shadow-neon)]">
@@ -89,7 +89,7 @@ function AuthPage() {
           UTAMU PORI
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          {mode === "signin" ? "Ingia kwenye account yako" : "Fungua account mpya"}
+          {mode === "signin" ? "Sign in to your account" : "Create a new account"}
         </p>
       </div>
 
@@ -103,11 +103,11 @@ function AuthPage() {
           <path fill="#4CAF50" d="M24 44c5 0 9.6-1.9 13.1-5l-6.1-5c-1.9 1.4-4.3 2.3-7 2.3-5.3 0-9.8-3.6-11.3-8.4l-6.5 5C9.5 39.6 16.1 44 24 44z"/>
           <path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.3-2.3 4.3-4.2 5.7l6.1 5C41.6 34.3 44 29.6 44 24c0-1.2-.1-2.3-.4-3.5z"/>
         </svg>
-        Endelea na Google
+        Continue with Google
       </button>
 
       <div className="mb-4 flex items-center gap-3 text-xs text-muted-foreground">
-        <span className="h-px flex-1 bg-border" /> AU <span className="h-px flex-1 bg-border" />
+        <span className="h-px flex-1 bg-border" /> OR <span className="h-px flex-1 bg-border" />
       </div>
 
       <form onSubmit={onSubmit} className="space-y-3">
@@ -118,7 +118,7 @@ function AuthPage() {
               type="text"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              placeholder="Jina lako"
+              placeholder="Your name"
               className="w-full rounded-xl border border-border bg-input px-3 py-3 text-sm outline-none focus:border-primary"
             />
           </div>
@@ -171,7 +171,7 @@ function AuthPage() {
       </form>
 
       <p className="mt-6 text-center text-sm text-muted-foreground">
-        {mode === "signin" ? "Huna account?" : "Una account tayari?"}{" "}
+        {mode === "signin" ? "Don't have an account?" : "Already have an account?"}{" "}
         <button
           onClick={() => setMode(mode === "signin" ? "signup" : "signin")}
           className="font-semibold text-secondary"
