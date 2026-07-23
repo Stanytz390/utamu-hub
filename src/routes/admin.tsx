@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
 const ADMIN_PASSWORD = "STANY#MINES";
 
@@ -34,10 +34,10 @@ function AdminDashboard() {
   const fetchStats = async () => {
     try {
       setLoadingStats(true);
-      const { count: u } = await supabase.from("profiles").select("*", { count: "exact", head: true });
-      const { count: v } = await supabase.from("videos").select("*", { count: "exact", head: true });
-      const { count: g } = await supabase.from("groups").select("*", { count: "exact", head: true });
-      const { count: d } = await supabase.from("dadaz_profiles").select("*", { count: "exact", head: true });
+      const { count: u } = await supabaseAdmin.from("profiles").select("*", { count: "exact", head: true });
+      const { count: v } = await supabaseAdmin.from("videos").select("*", { count: "exact", head: true });
+      const { count: g } = await supabaseAdmin.from("groups").select("*", { count: "exact", head: true });
+      const { count: d } = await supabaseAdmin.from("dadaz_profiles").select("*", { count: "exact", head: true });
       setStats({ users: u || 0, videos: v || 0, groups: g || 0, dadaz: d || 0 });
     } catch (e) {
       console.error("Stats error:", e);
@@ -207,7 +207,7 @@ function DashboardContent({ stats }: { stats: any }) {
 }
 
 // ============================================================
-// 2. MANAGE VIDEOS – FIXED (no category_slug)
+// 2. MANAGE VIDEOS – using supabaseAdmin and correct columns
 // ============================================================
 function VideosContent() {
   const [vids, setVids] = useState<any[]>([]);
@@ -219,7 +219,10 @@ function VideosContent() {
   const fetchVids = async () => {
     try {
       setLoading(true);
-      const { data } = await supabase.from("videos").select("*, categories(id, name)").order("created_at", { ascending: false });
+      const { data } = await supabaseAdmin
+        .from("videos")
+        .select("*, categories(id, name)")
+        .order("created_at", { ascending: false });
       setVids(data || []);
     } catch (e) { console.error(e); }
     finally { setLoading(false); }
@@ -227,7 +230,7 @@ function VideosContent() {
 
   const fetchCategories = async () => {
     try {
-      const { data } = await supabase.from("categories").select("id, name").order("sort_order");
+      const { data } = await supabaseAdmin.from("categories").select("id, name").order("sort_order");
       setCategories(data || []);
     } catch (e) { console.error(e); }
   };
@@ -245,7 +248,7 @@ function VideosContent() {
         is_published: true,
         category_id: form.category_id || null,
       };
-      const { error } = await supabase.from("videos").insert([payload]);
+      const { error } = await supabaseAdmin.from("videos").insert([payload]);
       if (error) throw error;
       alert("Video Added!");
       setShowAdd(false);
@@ -257,7 +260,7 @@ function VideosContent() {
   const deleteVideo = async (id: string) => {
     if (!confirm("Delete this video?")) return;
     try {
-      await supabase.from("videos").delete().eq("id", id);
+      await supabaseAdmin.from("videos").delete().eq("id", id);
       alert("Video deleted");
       fetchVids();
     } catch (err: any) { alert("Error: " + err.message); }
@@ -319,7 +322,7 @@ function DadazContent() {
   const fetchDadaz = async () => {
     try {
       setLoading(true);
-      const { data } = await supabase.from("dadaz_profiles").select("*").order("created_at", { ascending: false });
+      const { data } = await supabaseAdmin.from("dadaz_profiles").select("*").order("created_at", { ascending: false });
       setDadaz(data || []);
     } catch (e) { console.error(e); }
     finally { setLoading(false); }
@@ -329,7 +332,7 @@ function DadazContent() {
 
   const toggleApproval = async (id: string, current: boolean) => {
     try {
-      await supabase.from("dadaz_profiles").update({ is_admin_approved: !current }).eq("id", id);
+      await supabaseAdmin.from("dadaz_profiles").update({ is_admin_approved: !current }).eq("id", id);
       alert(!current ? "Approved!" : "Unapproved");
       fetchDadaz();
     } catch (err: any) { alert("Error: " + err.message); }
@@ -338,7 +341,7 @@ function DadazContent() {
   const deleteDadaz = async (id: string) => {
     if (!confirm("Delete this profile?")) return;
     try {
-      await supabase.from("dadaz_profiles").delete().eq("id", id);
+      await supabaseAdmin.from("dadaz_profiles").delete().eq("id", id);
       alert("Deleted");
       fetchDadaz();
     } catch (err: any) { alert("Error: " + err.message); }
@@ -379,7 +382,7 @@ function DadazContent() {
 }
 
 // ============================================================
-// 4. MANAGE GROUPS – FIXED (no is_published error)
+// 4. MANAGE GROUPS
 // ============================================================
 function GroupsContent() {
   const [groups, setGroups] = useState<any[]>([]);
@@ -390,7 +393,7 @@ function GroupsContent() {
   const fetchGroups = async () => {
     try {
       setLoading(true);
-      const { data } = await supabase.from("groups").select("*").order("created_at", { ascending: false });
+      const { data } = await supabaseAdmin.from("groups").select("*").order("created_at", { ascending: false });
       setGroups(data || []);
     } catch (e) { console.error(e); }
     finally { setLoading(false); }
@@ -401,7 +404,7 @@ function GroupsContent() {
   const save = async (e: any) => {
     e.preventDefault();
     try {
-      const { error } = await supabase.from("groups").insert([{ 
+      const { error } = await supabaseAdmin.from("groups").insert([{ 
         name: form.name, 
         link: form.link, 
         description: form.description, 
@@ -419,7 +422,7 @@ function GroupsContent() {
   const deleteGroup = async (id: string) => {
     if (!confirm("Delete this group?")) return;
     try {
-      await supabase.from("groups").delete().eq("id", id);
+      await supabaseAdmin.from("groups").delete().eq("id", id);
       alert("Deleted");
       fetchGroups();
     } catch (err: any) { alert("Error: " + err.message); }
@@ -460,7 +463,7 @@ function GroupsContent() {
 }
 
 // ============================================================
-// 5. REDEEM CODES – FIXED (no is_active error)
+// 5. REDEEM CODES
 // ============================================================
 function RedeemContent() {
   const [codes, setCodes] = useState<any[]>([]);
@@ -471,7 +474,7 @@ function RedeemContent() {
   const fetchCodes = async () => {
     try {
       setLoading(true);
-      const { data } = await supabase.from("redeem_links").select("*").order("created_at", { ascending: false });
+      const { data } = await supabaseAdmin.from("redeem_links").select("*").order("created_at", { ascending: false });
       setCodes(data || []);
     } catch (e) { console.error(e); }
     finally { setLoading(false); }
@@ -482,7 +485,7 @@ function RedeemContent() {
   const generate = async () => {
     try {
       const code = "UTAMU-" + Math.random().toString(36).substring(2, 7).toUpperCase();
-      const { error } = await supabase.from("redeem_links").insert({
+      const { error } = await supabaseAdmin.from("redeem_links").insert({
         code, 
         coins_sq: amt, 
         max_uses: uses,
@@ -497,7 +500,7 @@ function RedeemContent() {
   const deleteCode = async (id: string) => {
     if (!confirm("Delete this code?")) return;
     try {
-      await supabase.from("redeem_links").delete().eq("id", id);
+      await supabaseAdmin.from("redeem_links").delete().eq("id", id);
       alert("Deleted");
       fetchCodes();
     } catch (err: any) { alert("Error: " + err.message); }
@@ -546,7 +549,7 @@ function RedeemContent() {
 }
 
 // ============================================================
-// 6. APP SETTINGS – FIXED (no RLS recursion)
+// 6. APP SETTINGS
 // ============================================================
 function SettingsContent() {
   const [settings, setSettings] = useState<any>({});
@@ -556,7 +559,7 @@ function SettingsContent() {
     const fetch = async () => {
       try {
         setLoading(true);
-        const { data } = await supabase.from("app_settings").select("*");
+        const { data } = await supabaseAdmin.from("app_settings").select("*");
         const s: any = {};
         data?.forEach(item => s[item.key] = item.value);
         setSettings(s);
@@ -568,7 +571,7 @@ function SettingsContent() {
 
   const save = async (key: string, value: any) => {
     try {
-      const { error } = await supabase.from("app_settings").upsert({ key, value });
+      const { error } = await supabaseAdmin.from("app_settings").upsert({ key, value });
       if (error) throw error;
       alert(`Updated ${key}!`);
     } catch (err: any) { alert("Error: " + err.message); }
