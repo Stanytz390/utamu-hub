@@ -49,10 +49,7 @@ function AuthPage() {
           },
         });
         if (error) throw error;
-        if (ref) {
-          // Best-effort: link referral now that user is created (works if session is active).
-          await supabase.rpc("apply_referral", { _code: ref }).catch(() => {});
-        }
+        if (ref && typeof window !== "undefined") sessionStorage.setItem("pending_ref", ref);
         setInfo("Account imefunguliwa. Ukiona ukurasa wa email confirmation, angalia inbox yako. Ukiwa umeingia, elekea Profile.");
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
