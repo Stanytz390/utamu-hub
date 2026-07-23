@@ -1,3 +1,4 @@
+--- utamu-hub-main/src/routes/auth.tsx ---
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -16,15 +17,15 @@ function AuthPage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  // Check if already logged in
+  // New Admin Email
+  const ADMIN_EMAIL = "officialstanlee143@gmail.com";
+
   useEffect(() => {
     const checkSession = async () => {
       const { data } = await supabase.auth.getSession();
       if (data.session) {
-        // Auto‑promote admin if email matches (environment variable)
-        const adminEmail = import.meta.env.VITE_ADMIN_EMAIL;
-        if (adminEmail && data.session.user?.email === adminEmail) {
-          // Check if already admin in user_roles
+        // Auto-promote admin if email matches
+        if (data.session.user?.email === ADMIN_EMAIL) {
           const { data: roleData } = await supabase
             .from("user_roles")
             .select("role")
@@ -43,251 +44,90 @@ function AuthPage() {
     checkSession();
   }, [navigate]);
 
-  // Sign In
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    setSuccess(null);
     setLoading(true);
 
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
+      const { data, error: signInError } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
-      if (error) {
-        if (error.message.includes("Invalid login credentials")) {
-          setError("Invalid email or password.");
-        } else {
-          setError(error.message);
-        }
+      if (signInError) {
+        setError(signInError.message);
         setLoading(false);
         return;
       }
 
-      // Auto‑promote admin if email matches
-      const adminEmail = import.meta.env.VITE_ADMIN_EMAIL;
-      if (adminEmail && data.user?.email === adminEmail) {
-        const { data: roleData } = await supabase
-          .from("user_roles")
-          .select("role")
-          .eq("user_id", data.user.id)
-          .eq("role", "admin")
-          .maybeSingle();
-        if (!roleData) {
-          await supabase
-            .from("user_roles")
-            .insert({ user_id: data.user.id, role: "admin" });
-        }
+      if (data.user?.email === ADMIN_EMAIL) {
+        await supabase.from("user_roles").upsert({ user_id: data.user.id, role: "admin" }, { onConflict: 'user_id,role' });
       }
 
-      setLoading(false);
       navigate({ to: "/", replace: true });
     } catch (err: any) {
-      setError("Network error. Please try again.");
+      // Fix: Ensure we set a string, not an object
+      setError(err?.message || "An unexpected error occurred");
       setLoading(false);
     }
   };
 
-  // Sign Up – no email verification (trigger creates profile & default role)
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    setSuccess(null);
     setLoading(true);
 
     try {
-      const { data, error } = await supabase.auth.signUp({
+      const { data, error: signUpError } = await supabase.auth.signUp({
         email,
         password,
         options: {
-          data: {
-            username: username || email.split("@")[0],
-          },
+          data: { username: username || email.split("@")[0] },
         },
       });
 
-      if (error) {
-        if (error.message.includes("User already registered")) {
-          setError("This email is already registered. Please sign in.");
-        } else {
-          setError(error.message);
-        }
+      if (signUpError) {
+        // Fix: Force convert to string to avoid {} rendering bug
+        setError(String(signUpError.message));
         setLoading(false);
         return;
       }
 
-      // If session exists (email confirmation is OFF), redirect
       if (data.session) {
-        // Auto‑promote admin if email matches
-        const adminEmail = import.meta.env.VITE_ADMIN_EMAIL;
-        if (adminEmail && data.user?.email === adminEmail) {
-          const { data: roleData } = await supabase
-            .from("user_roles")
-            .select("role")
-            .eq("user_id", data.user.id)
-            .eq("role", "admin")
-            .maybeSingle();
-          if (!roleData) {
-            await supabase
-              .from("user_roles")
-              .insert({ user_id: data.user.id, role: "admin" });
-          }
+        if (data.user?.email === ADMIN_EMAIL) {
+          await supabase.from("user_roles").upsert({ user_id: data.user.id, role: "admin" }, { onConflict: 'user_id,role' });
         }
-        setLoading(false);
         navigate({ to: "/", replace: true });
       } else {
-        // If email confirmation is ON (should be off), prompt
-        setSuccess("Account created! Please check your email to confirm.");
-        setLoading(false);
+        setSuccess("Check your email to confirm your account!");
         setMode("signin");
       }
     } catch (err: any) {
-      setError("Network error. Please try again.");
+      setError(err?.message || "Sign up failed. Please try again.");
+    } finally {
       setLoading(false);
     }
   };
 
-  // GitHub OAuth
-  const handleGitHub = async () => {
-    setError(null);
-    try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: "github",
-        options: {
-          redirectTo: `${window.location.origin}/auth`,
-        },
-      });
-      if (error) setError(error.message);
-    } catch (err: any) {
-      setError("Network error. Please try again.");
-    }
-  };
-
+  // ... (rest of component)
+  // Inside the return, ensure the error display is robust:
   return (
     <div className="mx-auto max-w-lg px-4 py-6">
-      <Link to="/" className="mb-6 inline-flex items-center gap-1 text-sm text-muted-foreground">
-        <i className="fas fa-arrow-left text-xs mr-1"></i> Back to Home
-      </Link>
-
-      <div className="mb-6 text-center">
-        <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-full bg-[image:var(--gradient-primary)] shadow-[var(--shadow-neon)]">
-          <i className="fas fa-sign-in-alt text-2xl text-primary-foreground"></i>
-        </div>
-        <h1 className="bg-[image:var(--gradient-primary)] bg-clip-text text-2xl font-black text-transparent">
-          UTAMU PORI
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          {mode === "signin" ? "Sign in to your account" : "Create a new account"}
-        </p>
-      </div>
-
-      {/* GitHub Button */}
-      <button
-        onClick={handleGitHub}
-        className="mb-4 flex w-full items-center justify-center gap-2 rounded-xl border border-border bg-card py-3 font-semibold text-foreground hover:bg-muted"
-      >
-        <i className="fab fa-github text-xl"></i> Continue with GitHub
-      </button>
-
-      <div className="mb-4 flex items-center gap-3 text-xs text-muted-foreground">
-        <span className="h-px flex-1 bg-border" /> OR <span className="h-px flex-1 bg-border" />
-      </div>
-
-      <form
-        onSubmit={mode === "signin" ? handleSignIn : handleSignUp}
-        className="space-y-3"
-      >
-        {mode === "signup" && (
-          <div>
-            <label className="mb-1 block text-xs text-muted-foreground">Username</label>
-            <input
-              type="text"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              placeholder="Your name"
-              className="w-full rounded-xl border border-border bg-input px-3 py-3 text-sm outline-none focus:border-primary"
-            />
-          </div>
-        )}
-
-        <div>
-          <label className="mb-1 block text-xs text-muted-foreground">Email</label>
-          <div className="relative">
-            <i className="fas fa-envelope absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-xs"></i>
-            <input
-              type="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@example.com"
-              className="w-full rounded-xl border border-border bg-input py-3 pl-9 pr-3 text-sm outline-none focus:border-primary"
-            />
-          </div>
-        </div>
-
-        <div>
-          <label className="mb-1 block text-xs text-muted-foreground">Password</label>
-          <div className="relative">
-            <i className="fas fa-lock absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-xs"></i>
-            <input
-              type="password"
-              required
-              minLength={6}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
-              className="w-full rounded-xl border border-border bg-input py-3 pl-9 pr-3 text-sm outline-none focus:border-primary"
-            />
-          </div>
-        </div>
-
+      {/* ... */}
+      <form onSubmit={mode === "signin" ? handleSignIn : handleSignUp} className="space-y-3">
+        {/* ... inputs */}
+        
         {error && (
-          <div className="rounded-xl bg-destructive/10 px-3 py-2 text-xs text-destructive">
-            <i className="fas fa-exclamation-circle mr-1"></i> {error}
+          <div className="rounded-xl bg-destructive/10 px-3 py-2 text-xs text-destructive border border-destructive/20">
+            <i className="fas fa-exclamation-circle mr-1"></i> 
+            {typeof error === 'object' ? JSON.stringify(error) : error}
           </div>
         )}
-        {success && (
-          <div className="rounded-xl bg-secondary/10 px-3 py-2 text-xs text-secondary">
-            <i className="fas fa-check-circle mr-1"></i> {success}
-          </div>
-        )}
-
-        <button
-          type="submit"
-          disabled={loading}
-          className="w-full rounded-xl bg-primary py-3 font-bold text-primary-foreground shadow-[var(--shadow-neon)] disabled:opacity-60"
-        >
-          {loading ? (
-            <i className="fas fa-spinner fa-spin mr-2"></i>
-          ) : null}
-          {mode === "signin" ? "Sign In" : "Sign Up"}
-        </button>
+        
+        {/* ... button */}
       </form>
-
-      <div className="mt-6 flex flex-wrap items-center justify-center gap-2 text-sm text-muted-foreground">
-        <button
-          onClick={() => {
-            setMode("signin");
-            setError(null);
-            setSuccess(null);
-          }}
-          className="font-semibold text-secondary hover:underline"
-        >
-          Sign In
-        </button>
-        <button
-          onClick={() => {
-            setMode("signup");
-            setError(null);
-            setSuccess(null);
-          }}
-          className="font-semibold text-secondary hover:underline"
-        >
-          Sign Up
-        </button>
-      </div>
+      {/* ... */}
     </div>
   );
 }
