@@ -25,7 +25,6 @@ function DadazProfile() {
       setUserId(uid);
       setIsOwner(uid === id);
 
-      // Fetch profile
       const { data: profileData } = await supabase
         .from('profiles')
         .select('*')
@@ -33,7 +32,6 @@ function DadazProfile() {
         .single();
       setProfile(profileData);
 
-      // Fetch business contact (from business_contacts table)
       const { data: contactData } = await supabase
         .from('business_contacts')
         .select('*')
@@ -41,7 +39,6 @@ function DadazProfile() {
         .maybeSingle();
       setContact(contactData);
 
-      // Check if user already bought this contact
       if (uid && contactData) {
         const { data: tx } = await supabase
           .from('coin_transactions')
@@ -63,11 +60,9 @@ function DadazProfile() {
     if (!userId) return alert('Please login first.');
     if (!contact?.is_confirmed) return alert('Contact not confirmed by admin yet.');
 
-    // Single price for all contact methods
     const price = contact.contact_price || 0;
 
     if (price === 0) {
-      // Free – show immediately
       setShowContact(true);
       setContactBought(true);
       return;
@@ -96,7 +91,6 @@ function DadazProfile() {
 
   return (
     <div className="max-w-2xl mx-auto p-4">
-      {/* Profile header */}
       <div className="flex items-start gap-4">
         <img
           src={profile.avatar_url || 'https://via.placeholder.com/100'}
@@ -133,7 +127,6 @@ function DadazProfile() {
         </div>
       </div>
 
-      {/* Services (Dadaz can set prices for each service) */}
       {contact?.services && (
         <div className="mt-4 p-4 border rounded-lg bg-gray-50">
           <h3 className="font-semibold text-gray-700">
@@ -153,7 +146,6 @@ function DadazProfile() {
         </div>
       )}
 
-      {/* Contact actions */}
       <div className="mt-6 space-y-4">
         {!contactAvailable ? (
           <div className="text-center text-gray-500 py-4 border rounded-lg">
