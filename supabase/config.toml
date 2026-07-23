@@ -1,1 +1,23 @@
-project_id = "vhddrsgncgwpcduxtemv"
+# A configuration file used by the Supabase CLI to manage your project
+
+[general]
+project_id = "cmolmrkfotceaowlgwnr"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "auth", "storage"]
+
+[db]
+port = 54322
+shadow_port = 54320
+major_version = 15
+
+[studio]
+port = 54323
+
+[inbucket]
+port = 54324
+
+[storage]
+file_size_limit = "50MiB"
