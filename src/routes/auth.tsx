@@ -18,11 +18,29 @@ function AuthPage() {
 
   // Check if already logged in
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
+    const checkSession = async () => {
+      const { data } = await supabase.auth.getSession();
       if (data.session) {
+        // Auto‑promote admin if email matches (environment variable)
+        const adminEmail = import.meta.env.VITE_ADMIN_EMAIL;
+        if (adminEmail && data.session.user?.email === adminEmail) {
+          // Check if already admin in user_roles
+          const { data: roleData } = await supabase
+            .from("user_roles")
+            .select("role")
+            .eq("user_id", data.session.user.id)
+            .eq("role", "admin")
+            .maybeSingle();
+          if (!roleData) {
+            await supabase
+              .from("user_roles")
+              .insert({ user_id: data.session.user.id, role: "admin" });
+          }
+        }
         navigate({ to: "/", replace: true });
       }
-    });
+    };
+    checkSession();
   }, [navigate]);
 
   // Sign In
@@ -40,31 +58,39 @@ function AuthPage() {
 
       if (error) {
         if (error.message.includes("Invalid login credentials")) {
-          setError("Email au password sio sahihi.");
+          setError("Invalid email or password.");
         } else {
           setError(error.message);
         }
+        setLoading(false);
         return;
       }
 
       // Auto‑promote admin if email matches
       const adminEmail = import.meta.env.VITE_ADMIN_EMAIL;
       if (adminEmail && data.user?.email === adminEmail) {
-        await supabase
-          .from("profiles")
-          .upsert({ id: data.user.id, role: "admin" }, { onConflict: "id" });
+        const { data: roleData } = await supabase
+          .from("user_roles")
+          .select("role")
+          .eq("user_id", data.user.id)
+          .eq("role", "admin")
+          .maybeSingle();
+        if (!roleData) {
+          await supabase
+            .from("user_roles")
+            .insert({ user_id: data.user.id, role: "admin" });
+        }
       }
 
-      // Success – redirect to home
+      setLoading(false);
       navigate({ to: "/", replace: true });
     } catch (err: any) {
-      setError("Tatizo la mtandao. Jaribu tena.");
-    } finally {
+      setError("Network error. Please try again.");
       setLoading(false);
     }
   };
 
-  // Sign Up
+  // Sign Up – no email verification (trigger creates profile & default role)
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -84,31 +110,41 @@ function AuthPage() {
 
       if (error) {
         if (error.message.includes("User already registered")) {
-          setError("Email hii tayari imesajiliwa. Tafadhali ingia.");
+          setError("This email is already registered. Please sign in.");
         } else {
           setError(error.message);
         }
+        setLoading(false);
         return;
       }
 
-      // If email confirmation is OFF, user gets a session immediately
+      // If session exists (email confirmation is OFF), redirect
       if (data.session) {
+        // Auto‑promote admin if email matches
         const adminEmail = import.meta.env.VITE_ADMIN_EMAIL;
         if (adminEmail && data.user?.email === adminEmail) {
-          await supabase
-            .from("profiles")
-            .upsert({ id: data.user.id, role: "admin" }, { onConflict: "id" });
+          const { data: roleData } = await supabase
+            .from("user_roles")
+            .select("role")
+            .eq("user_id", data.user.id)
+            .eq("role", "admin")
+            .maybeSingle();
+          if (!roleData) {
+            await supabase
+              .from("user_roles")
+              .insert({ user_id: data.user.id, role: "admin" });
+          }
         }
-        // Success – redirect to home
+        setLoading(false);
         navigate({ to: "/", replace: true });
       } else {
-        // If email confirmation is ON, show a message
-        setSuccess("Account imeundwa! Angalia email yako kwa link ya kuthibitisha.");
+        // If email confirmation is ON (should be off), prompt
+        setSuccess("Account created! Please check your email to confirm.");
+        setLoading(false);
         setMode("signin");
       }
     } catch (err: any) {
-      setError("Tatizo la mtandao. Jaribu tena.");
-    } finally {
+      setError("Network error. Please try again.");
       setLoading(false);
     }
   };
@@ -125,14 +161,14 @@ function AuthPage() {
       });
       if (error) setError(error.message);
     } catch (err: any) {
-      setError("Tatizo la mtandao. Jaribu tena.");
+      setError("Network error. Please try again.");
     }
   };
 
   return (
     <div className="mx-auto max-w-lg px-4 py-6">
       <Link to="/" className="mb-6 inline-flex items-center gap-1 text-sm text-muted-foreground">
-        <i className="fas fa-arrow-left text-xs mr-1"></i> Rudi Nyumbani
+        <i className="fas fa-arrow-left text-xs mr-1"></i> Back to Home
       </Link>
 
       <div className="mb-6 text-center">
@@ -143,7 +179,7 @@ function AuthPage() {
           UTAMU PORI
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          {mode === "signin" ? "Ingia kwenye akaunti yako" : "Fungua akaunti mpya"}
+          {mode === "signin" ? "Sign in to your account" : "Create a new account"}
         </p>
       </div>
 
@@ -152,11 +188,11 @@ function AuthPage() {
         onClick={handleGitHub}
         className="mb-4 flex w-full items-center justify-center gap-2 rounded-xl border border-border bg-card py-3 font-semibold text-foreground hover:bg-muted"
       >
-        <i className="fab fa-github text-xl"></i> Endelea na GitHub
+        <i className="fab fa-github text-xl"></i> Continue with GitHub
       </button>
 
       <div className="mb-4 flex items-center gap-3 text-xs text-muted-foreground">
-        <span className="h-px flex-1 bg-border" /> AU <span className="h-px flex-1 bg-border" />
+        <span className="h-px flex-1 bg-border" /> OR <span className="h-px flex-1 bg-border" />
       </div>
 
       <form
@@ -165,19 +201,19 @@ function AuthPage() {
       >
         {mode === "signup" && (
           <div>
-            <label className="mb-1 block text-xs text-muted-foreground">Jina la Mtumiaji</label>
+            <label className="mb-1 block text-xs text-muted-foreground">Username</label>
             <input
               type="text"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              placeholder="Jina lako"
+              placeholder="Your name"
               className="w-full rounded-xl border border-border bg-input px-3 py-3 text-sm outline-none focus:border-primary"
             />
           </div>
         )}
 
         <div>
-          <label className="mb-1 block text-xs text-muted-foreground">Barua Pepe</label>
+          <label className="mb-1 block text-xs text-muted-foreground">Email</label>
           <div className="relative">
             <i className="fas fa-envelope absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-xs"></i>
             <input
@@ -192,7 +228,7 @@ function AuthPage() {
         </div>
 
         <div>
-          <label className="mb-1 block text-xs text-muted-foreground">Nenosiri</label>
+          <label className="mb-1 block text-xs text-muted-foreground">Password</label>
           <div className="relative">
             <i className="fas fa-lock absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-xs"></i>
             <input
@@ -226,7 +262,7 @@ function AuthPage() {
           {loading ? (
             <i className="fas fa-spinner fa-spin mr-2"></i>
           ) : null}
-          {mode === "signin" ? "Ingia" : "Jisajili"}
+          {mode === "signin" ? "Sign In" : "Sign Up"}
         </button>
       </form>
 
@@ -239,7 +275,7 @@ function AuthPage() {
           }}
           className="font-semibold text-secondary hover:underline"
         >
-          Ingia
+          Sign In
         </button>
         <button
           onClick={() => {
@@ -249,7 +285,7 @@ function AuthPage() {
           }}
           className="font-semibold text-secondary hover:underline"
         >
-          Jisajili
+          Sign Up
         </button>
       </div>
     </div>
