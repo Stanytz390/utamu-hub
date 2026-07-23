@@ -3,69 +3,66 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
 // ============================================================
-// ROUTE PROTECTION - with error logging
+// ROUTE – Disable SSR to avoid server-side auth issues
 // ============================================================
 export const Route = createFileRoute("/admin")({
-  beforeLoad: async () => {
-    console.log("🔍 Admin beforeLoad started");
-    const { data: { user } } = await supabase.auth.getUser();
-    console.log("👤 User:", user?.email);
-    if (!user) {
-      console.error("❌ No user found");
-      throw new Error("Please login first");
-    }
-
-    const { data: roleData, error } = await supabase
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", user.id)
-      .eq("role", "admin")
-      .maybeSingle();
-    console.log("🔑 Role data:", roleData);
-
-    if (error) {
-      console.error("❌ Role fetch error:", error);
-      throw new Error("Error checking admin role");
-    }
-
-    if (!roleData) {
-      console.error("❌ User is not admin");
-      throw new Error("Unauthorized Access");
-    }
-
-    console.log("✅ Admin access granted!");
-    return { user };
-  },
+  // ✅ ssr: false ensures the page only renders on the client
+  ssr: false,
   component: AdminDashboard,
 });
 
 // ============================================================
-// ADMIN DASHBOARD
+// ADMIN DASHBOARD – Full client-side
 // ============================================================
 function AdminDashboard() {
   const navigate = useNavigate();
+  const [loading, setLoading] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [activeTab, setActiveTab] = useState("dashboard");
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({ users: 0, videos: 0, groups: 0, dadaz: 0 });
 
-  // Fetch stats
+  // Check auth and admin role on client
   useEffect(() => {
-    const fetchStats = async () => {
+    const checkAuth = async () => {
       try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          navigate({ to: "/auth" });
+          return;
+        }
+
+        const { data: roleData } = await supabase
+          .from("user_roles")
+          .select("role")
+          .eq("user_id", user.id)
+          .eq("role", "admin")
+          .maybeSingle();
+
+        if (!roleData) {
+          alert("You are not an admin.");
+          navigate({ to: "/" });
+          return;
+        }
+
+        setIsAdmin(true);
+        // Fetch stats
         const { count: u } = await supabase.from("profiles").select("*", { count: "exact", head: true });
         const { count: v } = await supabase.from("videos").select("*", { count: "exact", head: true });
         const { count: g } = await supabase.from("groups").select("*", { count: "exact", head: true });
         const { count: d } = await supabase.from("dadaz_profiles").select("*", { count: "exact", head: true });
         setStats({ users: u || 0, videos: v || 0, groups: g || 0, dadaz: d || 0 });
-      } catch (e) {
-        console.error("Stats error:", e);
+      } catch (error) {
+        console.error("Auth check error:", error);
+        alert("An error occurred. Please try again.");
+        navigate({ to: "/" });
       } finally {
         setLoading(false);
       }
     };
-    fetchStats();
-  }, []);
+
+    checkAuth();
+  }, [navigate]);
 
   const menuItems = [
     { id: "dashboard", label: "Dashboard", icon: "fa-chart-line" },
@@ -77,6 +74,32 @@ function AdminDashboard() {
   ];
 
   const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center min-h-screen bg-[#050505] text-white">
+        <div className="text-center">
+          <i className="fas fa-spinner fa-spin text-4xl text-primary"></i>
+          <p className="mt-4 text-muted-foreground">Loading admin panel...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAdmin) {
+    return (
+      <div className="flex justify-center items-center min-h-screen bg-[#050505] text-white">
+        <div className="text-center">
+          <i className="fas fa-exclamation-triangle text-4xl text-red-500"></i>
+          <p className="mt-4 text-xl font-bold">Access Denied</p>
+          <p className="text-muted-foreground">You are not authorized to view this page.</p>
+          <button onClick={() => navigate({ to: "/" })} className="mt-4 bg-primary px-6 py-2 rounded-lg">
+            Go Home
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen bg-[#050505] text-white font-sans">
@@ -140,20 +163,14 @@ function AdminDashboard() {
           <p className="text-muted-foreground text-sm">Welcome back, Admin.</p>
         </header>
 
-        {loading ? (
-          <div className="flex justify-center items-center h-40">
-            <i className="fas fa-spinner fa-spin text-2xl text-primary"></i>
-          </div>
-        ) : (
-          <>
-            {activeTab === "dashboard" && <DashboardContent stats={stats} />}
-            {activeTab === "videos" && <VideosContent />}
-            {activeTab === "dadaz" && <DadazContent />}
-            {activeTab === "groups" && <GroupsContent />}
-            {activeTab === "redeem" && <RedeemContent />}
-            {activeTab === "settings" && <SettingsContent />}
-          </>
-        )}
+        <>
+          {activeTab === "dashboard" && <DashboardContent stats={stats} />}
+          {activeTab === "videos" && <VideosContent />}
+          {activeTab === "dadaz" && <DadazContent />}
+          {activeTab === "groups" && <GroupsContent />}
+          {activeTab === "redeem" && <RedeemContent />}
+          {activeTab === "settings" && <SettingsContent />}
+        </>
       </main>
     </div>
   );
