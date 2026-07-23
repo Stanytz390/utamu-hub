@@ -86,7 +86,6 @@ function AdminDashboard() {
   return (
     <div className="flex min-h-screen bg-muted/30">
       <Toaster position="top-right" richColors />
-      {/* Sidebar - mobile: hidden by default, shown via toggle */}
       <aside className="w-56 bg-card border-r border-border shadow-sm flex flex-col fixed inset-y-0 left-0 z-50 transform -translate-x-full md:translate-x-0 transition-transform duration-200 ease-in-out md:relative md:flex">
         <div className="p-4 border-b border-border bg-[image:var(--gradient-primary)] text-primary-foreground">
           <h1 className="text-base font-black">Admin</h1>
@@ -118,14 +117,11 @@ function AdminDashboard() {
         </div>
       </aside>
 
-      {/* Mobile header with menu toggle */}
       <div className="md:hidden fixed top-0 left-0 right-0 z-40 bg-card border-b border-border p-3 flex items-center justify-between">
         <button
           onClick={() => {
             const sidebar = document.querySelector("aside");
-            if (sidebar) {
-              sidebar.classList.toggle("-translate-x-full");
-            }
+            if (sidebar) sidebar.classList.toggle("-translate-x-full");
           }}
           className="text-foreground"
         >
@@ -137,7 +133,6 @@ function AdminDashboard() {
         </button>
       </div>
 
-      {/* Main content - with padding for mobile header */}
       <main className="flex-1 p-3 md:p-5 overflow-y-auto mt-14 md:mt-0">
         {activeTab === "dashboard" && <DashboardContent />}
         {activeTab === "users" && <UsersContent />}
@@ -153,9 +148,7 @@ function AdminDashboard() {
   );
 }
 
-// ============================================================
-// DASHBOARD – Small cards
-// ============================================================
+// ==================== DASHBOARD ====================
 function DashboardContent() {
   const [stats, setStats] = useState({ users: 0, videos: 0, groups: 0, coins: 0 });
   const [loading, setLoading] = useState(true);
@@ -163,24 +156,14 @@ function DashboardContent() {
   useEffect(() => {
     const fetchStats = async () => {
       setLoading(true);
-      const [
-        { count: users },
-        { count: videos },
-        { count: groups },
-        { data: wallets }
-      ] = await Promise.all([
+      const [{ count: users }, { count: videos }, { count: groups }, { data: wallets }] = await Promise.all([
         supabase.from("profiles").select("*", { count: "exact", head: true }),
         supabase.from("videos").select("*", { count: "exact", head: true }),
         supabase.from("groups").select("*", { count: "exact", head: true }),
         supabase.from("coin_wallets").select("balance_sq"),
       ]);
       const totalCoins = wallets?.reduce((acc, w) => acc + (w.balance_sq || 0), 0) || 0;
-      setStats({
-        users: users || 0,
-        videos: videos || 0,
-        groups: groups || 0,
-        coins: totalCoins,
-      });
+      setStats({ users: users || 0, videos: videos || 0, groups: groups || 0, coins: totalCoins });
       setLoading(false);
     };
     fetchStats();
@@ -200,7 +183,7 @@ function DashboardContent() {
       <div className="mt-3 bg-card p-3 rounded-xl border border-border">
         <p className="text-xs text-muted-foreground">
           <i className="fas fa-info-circle mr-1"></i>
-          Add data to see it here.
+          To add data, go to the respective tab and click the <strong className="text-primary">Add</strong> button.
         </p>
       </div>
     </div>
@@ -225,9 +208,7 @@ function SmallStatCard({ title, value, icon, color }) {
   );
 }
 
-// ============================================================
-// USERS
-// ============================================================
+// ==================== USERS ====================
 function UsersContent() {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -248,10 +229,10 @@ function UsersContent() {
   };
 
   const deleteUser = async (id) => {
-    if (!confirm("Delete?")) return;
+    if (!confirm("Delete this user permanently?")) return;
     await supabase.from("profiles").delete().eq("id", id);
     fetchUsers();
-    toast.success("Deleted");
+    toast.success("User deleted");
   };
 
   if (loading) return <Loading />;
@@ -267,15 +248,15 @@ function UsersContent() {
           <table className="w-full text-xs">
             <thead className="bg-muted/50">
               <tr>
-                <th className="px-2 py-2 text-left font-medium text-muted-foreground">Name</th>
-                <th className="px-2 py-2 text-left font-medium text-muted-foreground hidden sm:table-cell">Email</th>
-                <th className="px-2 py-2 text-left font-medium text-muted-foreground">Role</th>
-                <th className="px-2 py-2 text-left font-medium text-muted-foreground">Actions</th>
+                <th className="px-2 py-2 text-left font-medium">Name</th>
+                <th className="px-2 py-2 text-left font-medium hidden sm:table-cell">Email</th>
+                <th className="px-2 py-2 text-left font-medium">Role</th>
+                <th className="px-2 py-2 text-left font-medium">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
               {users.map((u) => (
-                <tr key={u.id} className="hover:bg-muted/30 transition">
+                <tr key={u.id} className="hover:bg-muted/30">
                   <td className="px-2 py-2">{u.full_name || u.username || "—"}</td>
                   <td className="px-2 py-2 hidden sm:table-cell">{u.email}</td>
                   <td className="px-2 py-2">
@@ -304,9 +285,7 @@ function UsersContent() {
   );
 }
 
-// ============================================================
-// VIDEOS
-// ============================================================
+// ==================== VIDEOS ====================
 function VideosContent() {
   const [videos, setVideos] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -350,7 +329,7 @@ function VideosContent() {
       const filePath = `videos/${Date.now()}_${file.name}`;
       const { error } = await supabase.storage.from("utamu_videos").upload(filePath, file);
       if (error) {
-        toast.error("Upload failed: " + error.message);
+        toast.error("Video upload failed: " + error.message);
         setUploading(false);
         return;
       }
@@ -396,10 +375,10 @@ function VideosContent() {
   };
 
   const deleteVideo = async (id) => {
-    if (!confirm("Delete?")) return;
+    if (!confirm("Delete this video?")) return;
     await supabase.from("videos").delete().eq("id", id);
     fetchVideos();
-    toast.success("Deleted");
+    toast.success("Video deleted");
   };
 
   const toggleStatus = async (id, current) => {
@@ -512,16 +491,16 @@ function VideosContent() {
           <table className="w-full text-xs">
             <thead className="bg-muted/50">
               <tr>
-                <th className="px-2 py-2 text-left font-medium text-muted-foreground">Title</th>
-                <th className="px-2 py-2 text-left font-medium text-muted-foreground hidden sm:table-cell">Category</th>
-                <th className="px-2 py-2 text-left font-medium text-muted-foreground">Price</th>
-                <th className="px-2 py-2 text-left font-medium text-muted-foreground">Status</th>
-                <th className="px-2 py-2 text-left font-medium text-muted-foreground">Actions</th>
+                <th className="px-2 py-2 text-left font-medium">Title</th>
+                <th className="px-2 py-2 text-left font-medium hidden sm:table-cell">Category</th>
+                <th className="px-2 py-2 text-left font-medium">Price</th>
+                <th className="px-2 py-2 text-left font-medium">Status</th>
+                <th className="px-2 py-2 text-left font-medium">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
               {videos.map((v) => (
-                <tr key={v.id} className="hover:bg-muted/30 transition">
+                <tr key={v.id} className="hover:bg-muted/30">
                   <td className="px-2 py-2 max-w-[80px] truncate">{v.title}</td>
                   <td className="px-2 py-2 hidden sm:table-cell">{v.category || "—"}</td>
                   <td className="px-2 py-2">{v.price_sq}</td>
@@ -560,9 +539,7 @@ function VideosContent() {
   );
 }
 
-// ============================================================
-// CATEGORIES
-// ============================================================
+// ==================== CATEGORIES ====================
 function CategoriesContent() {
   const [categories, setCategories] = useState([]);
   const [newName, setNewName] = useState("");
@@ -591,7 +568,7 @@ function CategoriesContent() {
   };
 
   const deleteCategory = async (id) => {
-    if (!confirm("Delete?")) return;
+    if (!confirm("Delete this category?")) return;
     await supabase.from("categories").delete().eq("id", id);
     fetchCategories();
     toast.success("Deleted");
@@ -644,9 +621,7 @@ function CategoriesContent() {
   );
 }
 
-// ============================================================
-// GROUPS
-// ============================================================
+// ==================== GROUPS ====================
 function GroupsContent() {
   const [groups, setGroups] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -682,7 +657,7 @@ function GroupsContent() {
   };
 
   const deleteGroup = async (id) => {
-    if (!confirm("Delete?")) return;
+    if (!confirm("Delete this group?")) return;
     await supabase.from("groups").delete().eq("id", id);
     fetchGroups();
     toast.success("Deleted");
@@ -755,15 +730,15 @@ function GroupsContent() {
           <table className="w-full text-xs">
             <thead className="bg-muted/50">
               <tr>
-                <th className="px-2 py-2 text-left font-medium text-muted-foreground">Name</th>
-                <th className="px-2 py-2 text-left font-medium text-muted-foreground">Price</th>
-                <th className="px-2 py-2 text-left font-medium text-muted-foreground hidden sm:table-cell">Link</th>
-                <th className="px-2 py-2 text-left font-medium text-muted-foreground">Actions</th>
+                <th className="px-2 py-2 text-left font-medium">Name</th>
+                <th className="px-2 py-2 text-left font-medium">Price</th>
+                <th className="px-2 py-2 text-left font-medium hidden sm:table-cell">Link</th>
+                <th className="px-2 py-2 text-left font-medium">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
               {groups.map((g) => (
-                <tr key={g.id} className="hover:bg-muted/30 transition">
+                <tr key={g.id} className="hover:bg-muted/30">
                   <td className="px-2 py-2">{g.name}</td>
                   <td className="px-2 py-2">{g.price_sq === 0 ? "Free" : `${g.price_sq} SQ`}</td>
                   <td className="px-2 py-2 hidden sm:table-cell">
@@ -787,9 +762,7 @@ function GroupsContent() {
   );
 }
 
-// ============================================================
-// BUSINESS – Full CRUD with modal
-// ============================================================
+// ==================== BUSINESS ====================
 function BusinessContent() {
   const [businesses, setBusinesses] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -881,7 +854,7 @@ function BusinessContent() {
   };
 
   const deleteBusinessContact = async (id) => {
-    if (!confirm("Delete?")) return;
+    if (!confirm("Delete this business contact?")) return;
     await supabase.from("business_contacts").delete().eq("business_id", id);
     fetchBusinesses();
     toast.success("Deleted");
@@ -901,18 +874,18 @@ function BusinessContent() {
           <table className="w-full text-xs">
             <thead className="bg-muted/50">
               <tr>
-                <th className="px-2 py-2 text-left font-medium text-muted-foreground">Name</th>
-                <th className="px-2 py-2 text-left font-medium text-muted-foreground hidden sm:table-cell">Email</th>
-                <th className="px-2 py-2 text-left font-medium text-muted-foreground">Status</th>
-                <th className="px-2 py-2 text-left font-medium text-muted-foreground">Balance</th>
-                <th className="px-2 py-2 text-left font-medium text-muted-foreground">Actions</th>
+                <th className="px-2 py-2 text-left font-medium">Name</th>
+                <th className="px-2 py-2 text-left font-medium hidden sm:table-cell">Email</th>
+                <th className="px-2 py-2 text-left font-medium">Status</th>
+                <th className="px-2 py-2 text-left font-medium">Balance</th>
+                <th className="px-2 py-2 text-left font-medium">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
               {businesses.map((b) => {
                 const contact = b.business_contacts?.[0];
                 return (
-                  <tr key={b.id} className="hover:bg-muted/30 transition">
+                  <tr key={b.id} className="hover:bg-muted/30">
                     <td className="px-2 py-2 flex items-center gap-1">
                       <img
                         src={b.avatar_url || "/default-avatar.png"}
@@ -946,7 +919,7 @@ function BusinessContent() {
         </div>
       </div>
 
-      {/* Edit Modal - mobile friendly */}
+      {/* Edit Modal */}
       {showEditModal && editing && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm px-3 py-10">
           <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl bg-card border border-border shadow-2xl p-4">
@@ -1055,9 +1028,7 @@ function BusinessContent() {
   );
 }
 
-// ============================================================
-// STORIES
-// ============================================================
+// ==================== STORIES ====================
 function StoriesContent() {
   const [stories, setStories] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -1078,7 +1049,7 @@ function StoriesContent() {
   };
 
   const deleteStory = async (id) => {
-    if (!confirm("Delete?")) return;
+    if (!confirm("Delete this story?")) return;
     await supabase.from("stories").delete().eq("id", id);
     fetchStories();
     toast.success("Deleted");
@@ -1094,15 +1065,15 @@ function StoriesContent() {
           <table className="w-full text-xs">
             <thead className="bg-muted/50">
               <tr>
-                <th className="px-2 py-2 text-left font-medium text-muted-foreground">User</th>
-                <th className="px-2 py-2 text-left font-medium text-muted-foreground">Status</th>
-                <th className="px-2 py-2 text-left font-medium text-muted-foreground hidden sm:table-cell">Expires</th>
-                <th className="px-2 py-2 text-left font-medium text-muted-foreground">Actions</th>
+                <th className="px-2 py-2 text-left font-medium">User</th>
+                <th className="px-2 py-2 text-left font-medium">Status</th>
+                <th className="px-2 py-2 text-left font-medium hidden sm:table-cell">Expires</th>
+                <th className="px-2 py-2 text-left font-medium">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
               {stories.map((s) => (
-                <tr key={s.id} className="hover:bg-muted/30 transition">
+                <tr key={s.id} className="hover:bg-muted/30">
                   <td className="px-2 py-2">{s.profiles?.full_name || "—"}</td>
                   <td className="px-2 py-2">
                     <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
@@ -1139,9 +1110,7 @@ function StoriesContent() {
   );
 }
 
-// ============================================================
-// REDEEM
-// ============================================================
+// ==================== REDEEM ====================
 function RedeemContent() {
   const [links, setLinks] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -1178,7 +1147,7 @@ function RedeemContent() {
   };
 
   const deleteLink = async (id) => {
-    if (!confirm("Delete?")) return;
+    if (!confirm("Delete this link?")) return;
     await supabase.from("redeem_links").delete().eq("id", id);
     fetchLinks();
     toast.success("Deleted");
@@ -1249,15 +1218,15 @@ function RedeemContent() {
           <table className="w-full text-xs">
             <thead className="bg-muted/50">
               <tr>
-                <th className="px-2 py-2 text-left font-medium text-muted-foreground">Code</th>
-                <th className="px-2 py-2 text-left font-medium text-muted-foreground">Coins</th>
-                <th className="px-2 py-2 text-left font-medium text-muted-foreground hidden sm:table-cell">Used</th>
-                <th className="px-2 py-2 text-left font-medium text-muted-foreground">Actions</th>
+                <th className="px-2 py-2 text-left font-medium">Code</th>
+                <th className="px-2 py-2 text-left font-medium">Coins</th>
+                <th className="px-2 py-2 text-left font-medium hidden sm:table-cell">Used</th>
+                <th className="px-2 py-2 text-left font-medium">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
               {links.map((l) => (
-                <tr key={l.id} className="hover:bg-muted/30 transition">
+                <tr key={l.id} className="hover:bg-muted/30">
                   <td className="px-2 py-2 font-mono text-[10px]">{l.code}</td>
                   <td className="px-2 py-2">{l.coins}</td>
                   <td className="px-2 py-2 hidden sm:table-cell">{l.used || 0} / {l.max_uses}</td>
@@ -1276,9 +1245,7 @@ function RedeemContent() {
   );
 }
 
-// ============================================================
-// SETTINGS
-// ============================================================
+// ==================== SETTINGS ====================
 function SettingsContent() {
   const [settings, setSettings] = useState({});
   const [loading, setLoading] = useState(true);
@@ -1347,9 +1314,7 @@ function SettingsContent() {
   );
 }
 
-// ============================================================
-// LOADING
-// ============================================================
+// ==================== LOADING ====================
 function Loading() {
   return (
     <div className="flex justify-center items-center h-32">
