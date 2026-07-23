@@ -57,7 +57,6 @@ function ProfilePage() {
             await supabase.from("referrals").insert({
               inviter_id: inviter.id,
               invitee_id: user.id,
-              code: pending,
               status: "pending",
             });
           }
