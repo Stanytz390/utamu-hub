@@ -1,8 +1,11 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { User, Phone, LogOut, Save } from "lucide-react";
+import { User, Phone, LogOut, Save, Coins } from "lucide-react";
+import { Link } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
+import { ReferralCard } from "@/components/ReferralCard";
+import { CoinBadge } from "@/components/CoinBadge";
 
 export const Route = createFileRoute("/_authenticated/profile")({
   head: () => ({
@@ -40,6 +43,27 @@ function ProfilePage() {
         setUsername(data.username ?? "");
         setPhone(data.phone ?? "");
       }
+      // Apply pending referral captured before signup, if any.
+      if (typeof window !== "undefined") {
+        const pending = sessionStorage.getItem("pending_ref");
+        if (pending) {
+          const { data: inviter } = await supabase
+            .from("profiles")
+            .select("id")
+            .eq("referral_code", pending)
+            .maybeSingle();
+          if (inviter && inviter.id !== user.id) {
+            await supabase.from("profiles").update({ referred_by: inviter.id }).eq("id", user.id);
+            await supabase.from("referrals").insert({
+              inviter_id: inviter.id,
+              invitee_id: user.id,
+              code: pending,
+              status: "pending",
+            });
+          }
+          sessionStorage.removeItem("pending_ref");
+        }
+      }
     })();
   }, []);
 
@@ -65,7 +89,10 @@ function ProfilePage() {
   return (
     <div className="mx-auto max-w-lg">
       <header className="border-b border-border/60 bg-background/80 px-4 py-3">
-        <h1 className="text-xl font-black">My Profile</h1>
+        <div className="flex items-center justify-between">
+          <h1 className="text-xl font-black">My Profile</h1>
+          <CoinBadge />
+        </div>
       </header>
 
       <section className="flex flex-col items-center p-6">
@@ -79,6 +106,16 @@ function ProfilePage() {
       </section>
 
       <section className="space-y-3 px-4">
+        <Link
+          to="/wallet"
+          className="flex items-center justify-between rounded-2xl border border-border bg-card p-4"
+        >
+          <span className="flex items-center gap-2 text-sm font-bold"><Coins size={16} className="text-primary" /> SQ Wallet</span>
+          <span className="text-xs text-muted-foreground">Top up · historia · redeem →</span>
+        </Link>
+
+        <ReferralCard />
+
         <div className="rounded-2xl border border-border bg-card p-4">
           <h2 className="mb-3 text-sm font-bold">Account details</h2>
 
