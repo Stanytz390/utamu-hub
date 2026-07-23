@@ -40,7 +40,6 @@ function Groups() {
       const { data: { user } } = await supabase.auth.getUser();
       setUserId(user?.id || null);
 
-      // Fetch all groups with member count
       const { data: groupsData, error: groupsError } = await supabase
         .from('groups')
         .select(`
@@ -56,7 +55,6 @@ function Groups() {
         return;
       }
 
-      // Map data with member count and check user membership
       const mapped = await Promise.all((groupsData || []).map(async (g: any) => {
         const memberCount = g.memberships?.[0]?.count || 0;
         let userJoined = false;
@@ -90,13 +88,11 @@ function Groups() {
       return;
     }
 
-    // Already a member – just open link
     if (group.user_joined) {
       window.open(group.link, '_blank');
       return;
     }
 
-    // Free group – join immediately
     if (group.price_sq === 0) {
       const { error } = await supabase
         .from('group_memberships')
@@ -105,7 +101,6 @@ function Groups() {
         alert('Error joining group: ' + error.message);
         return;
       }
-      // Update local state to reflect joined
       setGroups(prev => prev.map(g =>
         g.id === group.id ? { ...g, user_joined: true, member_count: g.member_count + 1 } : g
       ));
@@ -113,10 +108,8 @@ function Groups() {
       return;
     }
 
-    // Paid group – spend coins
     try {
       await spendCoins(userId, group.price_sq, 'group_purchase', group.id, `Joined group ${group.name}`);
-      // Insert membership
       const { error } = await supabase
         .from('group_memberships')
         .insert({ group_id: group.id, user_id: userId });
@@ -124,7 +117,6 @@ function Groups() {
         alert('Error joining group: ' + error.message);
         return;
       }
-      // Update local state
       setGroups(prev => prev.map(g =>
         g.id === group.id ? { ...g, user_joined: true, member_count: g.member_count + 1 } : g
       ));
