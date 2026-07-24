@@ -1,46 +1,36 @@
-import { defineConfig } from "vite";
-import react from "@vitejs/plugin-react";
-import { tanstackStart } from "@tanstack/react-start/plugin/vite";
-import tsConfigPaths from "vite-tsconfig-paths";
-import tailwindcss from "@tailwindcss/vite";
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+import { TanStackStartPlugin } from '@tanstack/start-plugin';
+import tsconfigPaths from 'vite-tsconfig-paths';
+import tailwindcss from '@tailwindcss/vite'; // Optional – if you use Tailwind CSS v4
 
+// https://vitejs.dev/config/
 export default defineConfig({
   plugins: [
-    tanstackStart({ server: { entry: "src/server.ts" } }),
+    // TanStack Start handles SSR and server functions
+    TanStackStartPlugin(),
+    // React support
     react(),
-    tsConfigPaths(),
+    // Resolve tsconfig paths (e.g., @/ → ./src)
+    tsconfigPaths(),
+    // Tailwind CSS (if you use it; remove if not)
     tailwindcss(),
   ],
-  ssr: {
-    noExternal: ["@tanstack/react-start", "@tanstack/react-router", "@tanstack/react-query"],
+  server: {
+    port: 3000,
+    open: true,
   },
   build: {
+    // Output directory (Vercel expects .vercel/output)
+    outDir: '.vercel/output',
     sourcemap: true,
-    rollupOptions: {
-      output: {
-        manualChunks: {
-          vendor: ["react", "react-dom", "@tanstack/react-router", "@tanstack/react-query"],
-          supabase: ["@supabase/supabase-js"],
-        },
-      },
+  },
+  // Environment variables – Vite injects VITE_* into import.meta.env
+  envPrefix: 'VITE_',
+  // Resolve aliases (optional – tsconfigPaths already does this)
+  resolve: {
+    alias: {
+      '@': '/src',
     },
-  },
-  server: { port: 3000, host: true },
-  resolve: { alias: { "@": "/src" } },
-  define: {
-    "process.env.SUPABASE_URL": JSON.stringify(process.env.SUPABASE_URL),
-    "process.env.SUPABASE_SERVICE_ROLE_KEY": JSON.stringify(process.env.SUPABASE_SERVICE_ROLE_KEY),
-    "process.env.NEXT_PUBLIC_SUPABASE_URL": JSON.stringify(process.env.NEXT_PUBLIC_SUPABASE_URL),
-    "process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY": JSON.stringify(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY),
-  },
-  nitro: {
-    preset: "vercel",
-    server: { entry: "src/server.ts" },
-    output: { dir: ".output" },
-    externals: { inline: ["@tanstack/react-start"] },
-    compressPublicAssets: true,
-  },
-  optimizeDeps: {
-    include: ["react", "react-dom", "@tanstack/react-router", "@tanstack/react-query", "@supabase/supabase-js"],
   },
 });
