@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { createServerFn } from "@tanstack/start";
+import { createServerFn } from "@tanstack/react-start"; // ← IMPORT CORRECT
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { useEffect, useState } from "react";
 
@@ -18,6 +18,28 @@ export const fetchStatsFn = createServerFn({
     const { count: groups } = await supabaseAdmin.from("groups").select("*", { count: "exact", head: true });
     const { count: dadaz } = await supabaseAdmin.from("dadaz_profiles").select("*", { count: "exact", head: true });
     return { users: users || 0, videos: videos || 0, groups: groups || 0, dadaz: dadaz || 0 };
+  },
+});
+
+// Users CRUD
+export const getUsersFn = createServerFn({
+  type: "query",
+  handler: async () => {
+    const { data, error } = await supabaseAdmin
+      .from("profiles")
+      .select("*")
+      .order("created_at", { ascending: false });
+    if (error) throw new Error(error.message);
+    return data || [];
+  },
+});
+
+export const deleteUserFn = createServerFn({
+  type: "mutation",
+  handler: async (id: string) => {
+    const { error } = await supabaseAdmin.from("profiles").delete().eq("id", id);
+    if (error) throw new Error(error.message);
+    return { success: true };
   },
 });
 
@@ -252,6 +274,7 @@ function AdminDashboard() {
 
   const menuItems = [
     { id: "dashboard", label: "Dashboard", icon: "fa-chart-line" },
+    { id: "users", label: "Manage Users", icon: "fa-users-cog" },
     { id: "videos", label: "Manage Videos", icon: "fa-video" },
     { id: "dadaz", label: "Manage Dadaz", icon: "fa-user-check" },
     { id: "groups", label: "Manage Groups", icon: "fa-users" },
@@ -322,6 +345,7 @@ function AdminDashboard() {
         ) : (
           <>
             {activeTab === "dashboard" && <DashboardContent stats={stats} />}
+            {activeTab === "users" && <UsersContent />}
             {activeTab === "videos" && <VideosContent />}
             {activeTab === "dadaz" && <DadazContent />}
             {activeTab === "groups" && <GroupsContent />}
@@ -335,7 +359,7 @@ function AdminDashboard() {
 }
 
 // ============================================================
-// 4. UI Components (using server functions for data)
+// 4. UI Components
 // ============================================================
 
 function DashboardContent({ stats }: { stats: any }) {
@@ -348,7 +372,7 @@ function DashboardContent({ stats }: { stats: any }) {
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-6">
       {cards.map((c, i) => (
-        <div key={i} className="bg-[#111] p-5 rounded-3xl border border-white/5 shadow-xl">
+        <div key={i} className="bg-[#111] p-5 rounded-3xl border border-white/5 shadow-xl hover:shadow-[0_0_30px_rgba(254,44,85,0.1)] transition-all">
           <i className={`fas ${c.icon} ${c.color} text-2xl mb-3`}></i>
           <p className="text-2xl font-black">{c.value}</p>
           <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">{c.label}</p>
@@ -358,6 +382,99 @@ function DashboardContent({ stats }: { stats: any }) {
   );
 }
 
+// -------------------- USERS --------------------
+function UsersContent() {
+  const [users, setUsers] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      const data = await getUsersFn();
+      setUsers(data);
+    } catch (e) {
+      console.error("Fetch users error:", e);
+      alert("Failed to load users");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { fetchData(); }, []);
+
+  const deleteUser = async (id: string) => {
+    if (!confirm("Delete this user permanently?")) return;
+    try {
+      await deleteUserFn({ data: id });
+      alert("User deleted");
+      fetchData();
+    } catch (err: any) {
+      alert("Error: " + err.message);
+    }
+  };
+
+  const filtered = users.filter(u =>
+    u.username?.toLowerCase().includes(search.toLowerCase()) ||
+    u.full_name?.toLowerCase().includes(search.toLowerCase()) ||
+    u.email?.toLowerCase().includes(search.toLowerCase())
+  );
+
+  if (loading) return <div className="flex justify-center items-center h-40"><i className="fas fa-spinner fa-spin text-2xl text-primary"></i></div>;
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
+        <p className="text-muted-foreground text-sm">Total users: <span className="font-bold text-white">{users.length}</span></p>
+        <input
+          type="text"
+          placeholder="Search by username, name, or email..."
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          className="w-full md:w-72 bg-black/50 border border-white/10 rounded-2xl px-4 py-3 text-sm outline-none focus:border-primary"
+        />
+      </div>
+      <div className="bg-[#111] rounded-3xl border border-white/5 overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-white/5 text-xs uppercase tracking-wider text-muted-foreground">
+              <tr>
+                <th className="px-4 py-3 text-left">User</th>
+                <th className="px-4 py-3 text-left">Username</th>
+                <th className="px-4 py-3 text-left hidden md:table-cell">Email</th>
+                <th className="px-4 py-3 text-left hidden lg:table-cell">Joined</th>
+                <th className="px-4 py-3 text-right">Action</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-white/5">
+              {filtered.map(u => (
+                <tr key={u.id} className="hover:bg-white/5 transition-colors">
+                  <td className="px-4 py-3 flex items-center gap-3">
+                    <img src={u.avatar_url || "https://ui-avatars.com/api/?name="+u.username} className="w-8 h-8 rounded-full border border-white/10 object-cover" />
+                    <span className="font-medium truncate max-w-[120px]">{u.full_name || u.username}</span>
+                  </td>
+                  <td className="px-4 py-3 font-mono text-xs">@{u.username}</td>
+                  <td className="px-4 py-3 hidden md:table-cell text-muted-foreground truncate max-w-[150px]">{u.email || "—"}</td>
+                  <td className="px-4 py-3 hidden lg:table-cell text-muted-foreground text-xs">{u.created_at ? new Date(u.created_at).toLocaleDateString() : "—"}</td>
+                  <td className="px-4 py-3 text-right">
+                    <button onClick={() => deleteUser(u.id)} className="text-red-500 hover:bg-red-500/10 p-2 rounded-xl transition-colors">
+                      <i className="fas fa-trash"></i>
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              {filtered.length === 0 && (
+                <tr><td colSpan={5} className="text-center py-8 text-muted-foreground">No users found</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// -------------------- VIDEOS --------------------
 function VideosContent() {
   const [vids, setVids] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -463,7 +580,7 @@ function VideosContent() {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {vids.map(v => (
-          <div key={v.id} className="bg-[#111] rounded-3xl border border-white/5 overflow-hidden group">
+          <div key={v.id} className="bg-[#111] rounded-3xl border border-white/5 overflow-hidden group hover:border-primary/30 transition-all">
             <div className="relative aspect-video">
               <img src={v.thumbnail || "https://via.placeholder.com/300x200"} className="w-full h-full object-cover" />
               <div className="absolute top-2 right-2 bg-black/60 backdrop-blur-md px-2 py-1 rounded-lg text-[10px] font-bold">{v.price_sq} SQ</div>
@@ -485,6 +602,7 @@ function VideosContent() {
   );
 }
 
+// -------------------- DADAZ --------------------
 function DadazContent() {
   const [dadaz, setDadaz] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -533,7 +651,7 @@ function DadazContent() {
       <div className="space-y-3">
         {dadaz.map(d => (
           <div key={d.id} className="bg-[#111] p-4 rounded-3xl border border-white/5 flex flex-col sm:flex-row gap-4 items-center">
-            <img src={d.avatar_url || "https://via.placeholder.com/100"} className="w-16 h-16 rounded-full border-2 border-primary object-cover" />
+            <img src={d.avatar_url || "https://ui-avatars.com/api/?name="+d.username} className="w-16 h-16 rounded-full border-2 border-primary object-cover" />
             <div className="flex-1 text-center sm:text-left min-w-0">
               <h4 className="font-black text-lg italic">@{d.username}</h4>
               <p className="text-xs text-muted-foreground truncate">{d.bio || "No bio set"}</p>
@@ -559,6 +677,7 @@ function DadazContent() {
   );
 }
 
+// -------------------- GROUPS --------------------
 function GroupsContent() {
   const [groups, setGroups] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -647,6 +766,7 @@ function GroupsContent() {
   );
 }
 
+// -------------------- REDEEM --------------------
 function RedeemContent() {
   const [codes, setCodes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -740,6 +860,7 @@ function RedeemContent() {
   );
 }
 
+// -------------------- SETTINGS --------------------
 function SettingsContent() {
   const [settings, setSettings] = useState<any>({});
   const [loading, setLoading] = useState(true);
