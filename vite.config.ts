@@ -1,36 +1,15 @@
-import { defineConfig } from 'vite';
-import react from '@vitejs/plugin-react';
-import { TanStackStartPlugin } from '@tanstack/start-plugin';
-import tsconfigPaths from 'vite-tsconfig-paths';
-import tailwindcss from '@tailwindcss/vite'; // Optional – if you use Tailwind CSS v4
+// @lovable.dev/vite-tanstack-config already includes the following — do NOT add them manually
+// or the app will break with duplicate plugins:
+//   - TanStack devtools (dev-only, first), tanstackStart, viteReact, tailwindcss, tsConfigPaths,
+//     nitro (build-only using cloudflare as a default target), VITE_* env injection, @ path alias,
+//     React/TanStack dedupe, error logger plugins, and sandbox detection (port/host/strictPort).
+// You can pass additional config via defineConfig({ vite: { ... }, etc... }) if needed.
+import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 
-// https://vitejs.dev/config/
 export default defineConfig({
-  plugins: [
-    // TanStack Start handles SSR and server functions
-    TanStackStartPlugin(),
-    // React support
-    react(),
-    // Resolve tsconfig paths (e.g., @/ → ./src)
-    tsconfigPaths(),
-    // Tailwind CSS (if you use it; remove if not)
-    tailwindcss(),
-  ],
-  server: {
-    port: 3000,
-    open: true,
-  },
-  build: {
-    // Output directory (Vercel expects .vercel/output)
-    outDir: '.vercel/output',
-    sourcemap: true,
-  },
-  // Environment variables – Vite injects VITE_* into import.meta.env
-  envPrefix: 'VITE_',
-  // Resolve aliases (optional – tsconfigPaths already does this)
-  resolve: {
-    alias: {
-      '@': '/src',
-    },
+  tanstackStart: {
+    // Redirect TanStack Start's bundled server entry to src/server.ts (our SSR error wrapper).
+    // nitro/vite builds from this
+    server: { entry: "server" },
   },
 });
